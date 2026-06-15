@@ -1,0 +1,151 @@
+import { useCallback, useEffect, useRef } from "react";
+import { useRuntimeStore } from "../stores/runtimeStore";
+import { emitPtyExit, emitPtyOutput } from "../lib/ptyBus";
+import { normalizeColumn, useKanbanStore } from "../stores/kanbanStore";
+import { wsUrl } from "../lib/api";
+
+export function useOrchestraWs(activeBoardId: string) {
+  const wsRef = useRef<WebSocket | null>(null);
+  const boardRef = useRef(activeBoardId);
+  const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const unmountedRef = useRef(false);
+  boardRef.current = activeBoardId;
+
+  const {
+    setConnected,
+    setNodeStatus,
+    setNodeError,
+    clearNodeError,
+    appendChat,
+    appendStream,
+    flushStream,
+  } = useRuntimeStore();
+
+  useEffect(() => {
+    unmountedRef.current = false;
+
+    const connect = () => {
+      if (unmountedRef.current) return;
+      const ws = new WebSocket(wsUrl());
+      wsRef.current = ws;
+
+      ws.onopen = () => setConnected(true);
+
+      ws.onclose = () => {
+        setConnected(false);
+        wsRef.current = null;
+        if (!unmountedRef.current) {
+          reconnectRef.current = setTimeout(connect, 1500);
+        }
+      };
+
+      ws.onerror = () => {
+        // onclose will handle reconnect
+      };
+
+      ws.onmessage = (ev) => {
+        const msg = JSON.parse(ev.data) as Record<string, unknown>;
+        const boardId = (msg.boardId as string) || boardRef.current;
+        if (
+          boardId !== boardRef.current &&
+          msg.type !== "connected" &&
+          msg.type !== "card_status"
+        )
+          return;
+
+        switch (msg.type) {
+          case "connected":
+            setConnected(true);
+            break;
+          case "node_status":
+            setNodeStatus(boardId, msg.nodeId as string, msg.status as never);
+            if (msg.status === "error" && msg.message) {
+              setNodeError(boardId, msg.nodeId as string, msg.message as string);
+              appendChat(boardId, {
+                nodeId: msg.nodeId as string,
+                kind: "system",
+                text: msg.message as string,
+              });
+            } else {
+              clearNodeError(boardId, msg.nodeId as string);
+            }
+            if (["idle", "done", "error"].includes(msg.status as string)) {
+              flushStream(boardId, msg.nodeId as string);
+            }
+            break;
+          case "pty_output":
+            emitPtyOutput(
+              `${boardId}:${msg.nodeId as string}`,
+              msg.data as string,
+              Boolean(msg.replay),
+            );
+            break;
+          case "pty_exit":
+            emitPtyExit(`${boardId}:${msg.nodeId as string}`, (msg.code as number) ?? 0);
+            break;
+          case "card_status": {
+            const col = normalizeColumn(msg.column as string);
+            if (col) useKanbanStore.getState().moveCardByBoard(boardId, col);
+            break;
+          }
+          case "stream": {
+            const kind = msg.kind as string;
+            if (kind === "text" || kind === "thinking") {
+              appendStream(boardId, msg.nodeId as string, msg.text as string);
+            } else if (kind === "tool_start") {
+              appendChat(boardId, {
+                nodeId: msg.nodeId as string,
+                kind: "tool",
+                text: `tool_start ${msg.text}`,
+              });
+            } else if (kind === "tool_end") {
+              appendChat(boardId, {
+                nodeId: msg.nodeId as string,
+                kind: "tool",
+                text: `tool_end ${msg.text}`,
+              });
+            }
+            break;
+          }
+          case "message_in":
+            appendChat(boardId, {
+              nodeId: msg.nodeId as string,
+              kind: msg.source === "user" ? "user" : "agent",
+              text: msg.text as string,
+            });
+            break;
+          case "turn_end":
+            flushStream(boardId, msg.nodeId as string);
+            break;
+          case "error":
+            appendChat(boardId, {
+              nodeId: (msg.nodeId as string) ?? "system",
+              kind: "system",                text: `error ${msg.message}`,
+            });
+            break;
+        }
+      };
+    };
+
+    connect();
+
+    return () => {
+      unmountedRef.current = true;
+      if (reconnectRef.current) clearTimeout(reconnectRef.current);
+      wsRef.current?.close();
+      wsRef.current = null;
+      setConnected(false);
+    };
+  }, [setConnected, setNodeStatus, appendChat, appendStream, flushStream]);
+
+  // Stable identity: relies only on refs, so consumers (e.g. the terminal)
+  // don't tear down on every render.
+  const send = useCallback((msg: Record<string, unknown>) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      // Default to the active board, but let callers target another board explicitly.
+      wsRef.current.send(JSON.stringify({ boardId: boardRef.current, ...msg }));
+    }
+  }, []);
+
+  return { send };
+}

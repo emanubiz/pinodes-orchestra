@@ -1,0 +1,36 @@
+// Lightweight pub/sub bridging the single WebSocket to per-node xterm instances.
+// Keyed by `${boardId}:${nodeId}`.
+
+type OutputHandler = (data: string, replay: boolean) => void;
+type ExitHandler = (code: number) => void;
+
+const outputSubs = new Map<string, Set<OutputHandler>>();
+const exitSubs = new Map<string, Set<ExitHandler>>();
+
+export function onPtyOutput(key: string, handler: OutputHandler): () => void {
+  let set = outputSubs.get(key);
+  if (!set) {
+    set = new Set();
+    outputSubs.set(key, set);
+  }
+  set.add(handler);
+  return () => set!.delete(handler);
+}
+
+export function onPtyExit(key: string, handler: ExitHandler): () => void {
+  let set = exitSubs.get(key);
+  if (!set) {
+    set = new Set();
+    exitSubs.set(key, set);
+  }
+  set.add(handler);
+  return () => set!.delete(handler);
+}
+
+export function emitPtyOutput(key: string, data: string, replay: boolean): void {
+  outputSubs.get(key)?.forEach((h) => h(data, replay));
+}
+
+export function emitPtyExit(key: string, code: number): void {
+  exitSubs.get(key)?.forEach((h) => h(code));
+}

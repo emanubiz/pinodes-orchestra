@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="pi-orchestra">
+  <rect width="512" height="512" rx="96" fill="#09090b"/>
+  <circle cx="128" cy="256" r="40" fill="#34d399"/>
+  <circle cx="256" cy="160" r="40" fill="#a78bfa"/>
+  <circle cx="384" cy="256" r="40" fill="#38bdf8"/>
+  <circle cx="256" cy="352" r="40" fill="#fbbf24"/>
+  <path d="M168 256 L216 200 M296 200 L344 256 M296 312 L344 256 M168 256 L216 312" stroke="#52525b" stroke-width="12" stroke-linecap="round"/>
+</svg>

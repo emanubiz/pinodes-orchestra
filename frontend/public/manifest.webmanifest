@@ -1,0 +1,18 @@
+{
+  "name": "pi-orchestra",
+  "short_name": "pi-orchestra",
+  "description": "Visual multi-agent pi console orchestrator",
+  "theme_color": "#09090b",
+  "background_color": "#09090b",
+  "display": "standalone",
+  "start_url": "/",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

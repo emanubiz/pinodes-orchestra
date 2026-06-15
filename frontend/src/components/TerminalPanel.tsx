@@ -1,0 +1,143 @@
+import { useEffect, useRef } from "react";
+import { RotateCw, Square } from "lucide-react";
+import { Terminal } from "@xterm/xterm";
+import { FitAddon } from "@xterm/addon-fit";
+import "@xterm/xterm/css/xterm.css";
+import { useRuntimeStore } from "../stores/runtimeStore";
+import { onPtyExit, onPtyOutput } from "../lib/ptyBus";
+
+interface TerminalPanelProps {
+  boardId: string;
+  send: (msg: Record<string, unknown>) => void;
+}
+
+const THEME = {
+  background: "#09090b",
+  foreground: "#e4e4e7",
+  cursor: "#a78bfa",
+  cursorAccent: "#09090b",
+  selectionBackground: "rgba(139,92,246,0.35)",
+  black: "#18181b",
+  brightBlack: "#52525b",
+};
+
+export function TerminalPanel({ boardId, send }: TerminalPanelProps) {
+  const selectedNodeId = useRuntimeStore((s) => s.selectedNodeId);
+  const status = useRuntimeStore((s) =>
+    selectedNodeId ? s.nodeStatus[`${boardId}:${selectedNodeId}`] : undefined,
+  );
+  const hostRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!selectedNodeId || !host) return;
+    const key = `${boardId}:${selectedNodeId}`;
+
+    const term = new Terminal({
+      convertEol: false,
+      fontSize: 12.5,
+      lineHeight: 1.15,
+      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+      theme: THEME,
+      cursorBlink: true,
+      scrollback: 5000,
+      allowProposedApi: true,
+    });
+    const fit = new FitAddon();
+    term.loadAddon(fit);
+    term.open(host);
+
+    const unsubOut = onPtyOutput(key, (data, replay) => {
+      if (replay) term.reset();
+      term.write(data);
+    });
+    const unsubExit = onPtyExit(key, () => {
+      term.write("\r\n\x1b[2m- pi session ended - use Restart -\x1b[0m\r\n");
+    });
+
+    const onData = term.onData((data) => send({ type: "pty_input", nodeId: selectedNodeId, data }));
+
+    const frame = requestAnimationFrame(() => {
+      try {
+        fit.fit();
+      } catch {
+        /* container not measured yet */
+      }
+      send({ type: "attach_node", nodeId: selectedNodeId, cols: term.cols, rows: term.rows });
+    });
+
+    const ro = new ResizeObserver(() => {
+      try {
+        fit.fit();
+        send({ type: "pty_resize", nodeId: selectedNodeId, cols: term.cols, rows: term.rows });
+      } catch {
+        /* mid-teardown */
+      }
+    });
+    ro.observe(host);
+
+    term.focus();
+
+    return () => {
+      cancelAnimationFrame(frame);
+      ro.disconnect();
+      onData.dispose();
+      unsubOut();
+      unsubExit();
+      term.dispose();
+    };
+  }, [boardId, selectedNodeId, send]);
+
+  if (!selectedNodeId) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[#09090b] text-sm text-zinc-600 p-4 text-center">
+        Select a node to open its pi terminal
+      </div>
+    );
+  }
+
+  const running = status === "running";
+
+  return (
+    <div className="flex h-full flex-col bg-[#09090b]">
+      <div className="flex items-center justify-between border-b border-white/5 px-3 py-1.5 shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            className={`h-1.5 w-1.5 rounded-full shrink-0 ${
+              running ? "bg-emerald-400 live-dot" : "bg-zinc-600"
+            }`}
+          />
+          <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-500">
+            pi
+          </span>
+          <span className="text-xs font-mono text-zinc-400 truncate">
+            {selectedNodeId.slice(0, 8)}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => send({ type: "restart_node", nodeId: selectedNodeId })}
+            className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-zinc-300 transition-colors hover:bg-white/10"
+            title="Restart the pi session"
+          >
+            <RotateCw size={11} strokeWidth={2} />
+            Restart
+          </button>
+          <button
+            type="button"
+            onClick={() => send({ type: "abort_node", nodeId: selectedNodeId })}
+            className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-red-500/10 text-red-400 border border-red-500/20 transition-colors hover:bg-red-500/20"
+            title="End the session"
+          >
+            <Square size={10} strokeWidth={2} fill="currentColor" />
+            Stop
+          </button>
+        </div>
+      </div>
+      <div className="flex-1 min-h-0 overflow-hidden px-1.5 py-1">
+        <div ref={hostRef} className="h-full w-full" />
+      </div>
+    </div>
+  );
+}

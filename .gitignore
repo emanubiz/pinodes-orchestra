@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+.vite/
+
+# Data & local state
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Editor / OS / tooling
+.DS_Store
+.claude/
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*

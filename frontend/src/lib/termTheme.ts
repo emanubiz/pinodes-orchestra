@@ -1,0 +1,29 @@
+import { createContext, useContext } from "react";
+
+export const TERM_THEME = {
+  background: "#09090b",
+  foreground: "#e4e4e7",
+  cursor: "#a78bfa",
+  cursorAccent: "#09090b",
+  selectionBackground: "rgba(139,92,246,0.35)",
+  black: "#18181b",
+  brightBlack: "#52525b",
+};
+
+export const TERM_FONT =
+  "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
+
+export interface TerminalBridge {
+  boardId: string;
+  send: (msg: Record<string, unknown>) => void;
+  onExpand: (nodeId: string) => void;
+  onDelete: (nodeId: string) => void;
+}
+
+export const TerminalContext = createContext<TerminalBridge | null>(null);
+
+export function useTerminalBridge(): TerminalBridge {
+  const ctx = useContext(TerminalContext);
+  if (!ctx) throw new Error("TerminalContext non disponibile");
+  return ctx;
+}

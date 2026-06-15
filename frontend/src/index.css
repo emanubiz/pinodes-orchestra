@@ -1,0 +1,142 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: #e4e4e7;
+  background-color: #09090b;
+}
+
+/* ── Refined scrollbars ─────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(113, 113, 122, 0.32) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(113, 113, 122, 0.28);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background 0.2s;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.45);
+  background-clip: padding-box;
+}
+
+::selection {
+  background: rgba(139, 92, 246, 0.32);
+}
+
+/* ── Motion ─────────────────────────────────────────── */
+/* Running nodes pulse the left accent bar — no card-wide glow. */
+@keyframes bar-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+.bar-running {
+  animation: bar-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes live-ping {
+  0%        { transform: scale(1); opacity: 0.65; }
+  75%, 100% { transform: scale(2.4); opacity: 0; }
+}
+.live-dot {
+  position: relative;
+}
+.live-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: inherit;
+  animation: live-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes fade-rise {
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-rise {
+  animation: fade-rise 0.18s ease-out;
+}
+
+/* ── App toolbar (VSCode-style) ─────────────────────── */
+.toolbar-segment {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0 0.5rem;
+  border-right: 1px solid rgba(39, 39, 42, 0.9);
+  height: 100%;
+}
+.toolbar-segment:last-child {
+  border-right: none;
+}
+.toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.5rem;
+  min-width: 1.5rem;
+  padding: 0 0.375rem;
+  border-radius: 0.25rem;
+  color: #a1a1aa;
+  transition: background 0.15s, color 0.15s;
+}
+.toolbar-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #e4e4e7;
+}
+.toolbar-btn.active {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f4f4f5;
+}
+.toolbar-btn.danger:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+}
+
+/* ── React Flow polish ──────────────────────────────── */
+.react-flow__node {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+.react-flow__edge-path {
+  stroke-width: 1.5;
+}
+.react-flow__handle {
+  transition: transform 0.15s, background 0.15s;
+}
+.react-flow__handle:hover {
+  transform: scale(1.35);
+}
+.react-flow__controls {
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+.react-flow__controls button {
+  border: none !important;
+}
+.react-flow__minimap {
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}

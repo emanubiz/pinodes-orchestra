@@ -1,0 +1,164 @@
+import { create } from "zustand";
+import type { ChatLine, NodeStatus, SystemPrompt, WorkflowGraph } from "../types";
+
+function nodeKey(boardId: string, nodeId: string): string {
+  return `${boardId}:${nodeId}`;
+}
+
+interface RuntimeState {
+  connected: boolean;
+  activeBoardId: string;
+  nodeStatus: Record<string, NodeStatus>;
+  chatByNode: Record<string, ChatLine[]>;
+  streamBuffer: Record<string, string>;
+  nodeError: Record<string, string>;
+  selectedNodeId: string | null;
+  prompts: SystemPrompt[];
+  runPromptDraft: string;
+
+  setConnected: (v: boolean) => void;
+  setActiveBoardId: (boardId: string) => void;
+  setSelectedNodeId: (id: string | null) => void;
+  setPrompts: (p: SystemPrompt[]) => void;
+  setRunPromptDraft: (v: string) => void;
+  setNodeStatus: (boardId: string, nodeId: string, status: NodeStatus) => void;
+  setNodeError: (boardId: string, nodeId: string, message: string) => void;
+  clearNodeError: (boardId: string, nodeId: string) => void;
+  appendChat: (boardId: string, line: Omit<ChatLine, "id" | "ts">) => void;
+  appendStream: (boardId: string, nodeId: string, text: string) => void;
+  flushStream: (boardId: string, nodeId: string) => void;
+  clearBoardRuntime: (boardId: string) => void;
+}
+
+export const useRuntimeStore = create<RuntimeState>((set, get) => ({
+  connected: false,
+  activeBoardId: "",
+  nodeStatus: {},
+  chatByNode: {},
+  streamBuffer: {},
+  nodeError: {},
+  selectedNodeId: null,
+  prompts: [],
+  runPromptDraft: "",
+
+  setConnected: (v) => set({ connected: v }),
+  setActiveBoardId: (boardId) => set({ activeBoardId: boardId, selectedNodeId: null }),
+  setSelectedNodeId: (id) => set({ selectedNodeId: id }),
+  setPrompts: (p) => set({ prompts: p }),
+  setRunPromptDraft: (v) => set({ runPromptDraft: v }),
+
+  setNodeStatus: (boardId, nodeId, status) =>
+    set((s) => ({
+      nodeStatus: { ...s.nodeStatus, [nodeKey(boardId, nodeId)]: status },
+    })),
+
+  setNodeError: (boardId, nodeId, message) =>
+    set((s) => ({
+      nodeError: { ...s.nodeError, [nodeKey(boardId, nodeId)]: message },
+    })),
+
+  clearNodeError: (boardId, nodeId) =>
+    set((s) => {
+      const next = { ...s.nodeError };
+      delete next[nodeKey(boardId, nodeId)];
+      return { nodeError: next };
+    }),
+
+  appendChat: (boardId, line) =>
+    set((s) => {
+      const key = nodeKey(boardId, line.nodeId);
+      const entry: ChatLine = {
+        ...line,
+        id: crypto.randomUUID(),
+        ts: Date.now(),
+      };
+      const prev = s.chatByNode[key] ?? [];
+      return { chatByNode: { ...s.chatByNode, [key]: [...prev, entry] } };
+    }),
+
+  appendStream: (boardId, nodeId, text) => {
+    const key = nodeKey(boardId, nodeId);
+    const buf = (get().streamBuffer[key] ?? "") + text;
+    set((s) => ({ streamBuffer: { ...s.streamBuffer, [key]: buf } }));
+  },
+
+  flushStream: (boardId, nodeId) =>
+    set((s) => {
+      const key = nodeKey(boardId, nodeId);
+      const text = s.streamBuffer[key];
+      if (!text) return s;
+      const entry: ChatLine = {
+        id: crypto.randomUUID(),
+        nodeId,
+        kind: "stream",
+        text,
+        ts: Date.now(),
+      };
+      const prev = s.chatByNode[key] ?? [];
+      const next = { ...s.streamBuffer };
+      delete next[key];
+      return {
+        streamBuffer: next,
+        chatByNode: { ...s.chatByNode, [key]: [...prev, entry] },
+      };
+    }),
+
+  clearBoardRuntime: (boardId) =>
+    set((s) => {
+      const prefix = `${boardId}:`;
+      const nodeStatus = { ...s.nodeStatus };
+      const chatByNode = { ...s.chatByNode };
+      const streamBuffer = { ...s.streamBuffer };
+      const nodeError = { ...s.nodeError };
+      for (const k of Object.keys(nodeStatus)) {
+        if (k.startsWith(prefix)) delete nodeStatus[k];
+      }
+      for (const k of Object.keys(chatByNode)) {
+        if (k.startsWith(prefix)) delete chatByNode[k];
+      }
+      for (const k of Object.keys(streamBuffer)) {
+        if (k.startsWith(prefix)) delete streamBuffer[k];
+      }
+      for (const k of Object.keys(nodeError)) {
+        if (k.startsWith(prefix)) delete nodeError[k];
+      }
+      return { nodeStatus, chatByNode, streamBuffer, nodeError };
+    }),
+}));
+
+export function graphFromFlow(
+  nodes: Array<{
+    id: string;
+    position: { x: number; y: number };
+    data: {
+      label: string;
+      promptId: string;
+      promptOverride?: string;
+    };
+  }>,
+  edges: Array<{ id: string; source: string; target: string }>,
+  name: string,
+  id: string | null,
+  cwd: string,
+  entryNodeId: string | null,
+): WorkflowGraph {
+  return {
+    id: id ?? undefined,
+    name,
+    cwd,
+    entryNodeId,
+    nodes: nodes.map((n) => ({
+      id: n.id,
+      label: n.data.label,
+      promptId: n.data.promptId,
+      promptOverride: n.data.promptOverride ?? null,
+      position: n.position,
+    })),
+    edges: edges.map((e) => ({
+      id: e.id,
+      sourceNodeId: e.source,
+      targetNodeId: e.target,
+    })),
+  };
+}
+
