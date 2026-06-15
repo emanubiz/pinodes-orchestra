@@ -49,6 +49,8 @@ Status is driven by PTY lifecycle (`spawn` → `running`, `onExit` → `idle`).
 
 There is no separate `steer` API: intervention is **terminal-native** — you type into the pi TUI like a normal console.
 
+**Terminal mirroring & PTY geometry.** Each node has a single backend PTY that can be viewed from two places: the read-only mini terminal on the node card and the interactive side-panel terminal. Both `attach_node` to the same session and replay its scrollback, but **only the interactive owner sizes the PTY** (`fit()` → `pty_resize`). Read-only mirrors attach with `spawn:false` and never resize — otherwise the PTY width would drift from the interactive xterm and pi's input line would wrap on every keystroke.
+
 ## Handoff protocol
 
 Agents delegate via a **text block** parsed by `backend/pi-extensions/call-agent.ts` on `turn_end`:
@@ -134,7 +136,7 @@ pi-orchestra/
 | Command | Purpose |
 |---------|---------|
 | `load_graph` | Sync nodes/edges + cwd to PtyHub |
-| `attach_node` | Subscribe to scrollback; optionally spawn pi |
+| `attach_node` | Subscribe to scrollback; optionally spawn pi (`spawn:false` for read-only mirrors) |
 | `pty_input` | User keystrokes into pi |
 | `pty_resize` | Terminal geometry |
 | `inject_task` | Start flow at a node (Kanban / Run) |
