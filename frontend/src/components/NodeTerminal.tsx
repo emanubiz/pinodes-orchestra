@@ -15,10 +15,9 @@ export function NodeTerminal({ nodeId }: { nodeId: string }) {
   const [live, setLive] = useState(false);
   const connected = useRuntimeStore((s) => s.connected);
 
-  // 1. Mount terminal and wire PTY output.
   useEffect(() => {
     const host = hostRef.current;
-    if (!host) return;
+    if (!host || !connected) return;
     const key = `${boardId}:${nodeId}`;
 
     const term = new Terminal({
@@ -44,10 +43,13 @@ export function NodeTerminal({ nodeId }: { nodeId: string }) {
       term.write(data);
     });
 
+    // Attach only to receive scrollback/replay. Do NOT resize the shared PTY:
+    // the interactive terminal (side panel or overlay) owns the dimensions.
+    send({ type: "attach_node", nodeId, cols: 80, rows: 24, spawn: false });
+
     const ro = new ResizeObserver(() => {
       try {
         fit.fit();
-        send({ type: "pty_resize", nodeId, cols: term.cols, rows: term.rows });
       } catch {
         /* mid-teardown */
       }
@@ -61,21 +63,7 @@ export function NodeTerminal({ nodeId }: { nodeId: string }) {
       termRef.current = null;
       fitRef.current = null;
     };
-  }, [boardId, nodeId, send]);
-
-  // 2. Attach to the backend only once the WebSocket is actually open.
-  useEffect(() => {
-    if (!connected) return;
-    const term = termRef.current;
-    const fit = fitRef.current;
-    if (!term || !fit) return;
-    try {
-      fit.fit();
-    } catch {
-      /* not measured yet */
-    }
-    send({ type: "attach_node", nodeId, cols: term.cols, rows: term.rows });
-  }, [connected, nodeId, send]);
+  }, [boardId, nodeId, send, connected]);
 
   // pointer-events off so dragging/clicking the node still works through it.
   return (

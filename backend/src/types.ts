@@ -32,6 +32,23 @@ export interface SystemPromptRow {
   updated_at: string;
 }
 
+export interface BoardState {
+  boardId: string;
+  cwd: string;
+  label: string;
+  graph?: WorkflowGraph;
+  createdAt: number;
+}
+
+export interface BoardRow {
+  id: string;
+  cwd: string;
+  label: string;
+  graph_data: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface WsClientMessage {
   type: string;
   [key: string]: unknown;

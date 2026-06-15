@@ -1,8 +1,8 @@
-# Programmatic API (planned)
+# Programmatic API
 
 REST and CLI surface for **host integrations** — Hermes Desktop tab, OpenClaw plugin, VSCode/Cursor extension, CI pipelines.
 
-> **Status:** specified, not fully implemented. Standalone today uses WebSocket for live control and partial REST for persistence. This document is the contract future hosts should target.
+> **Status:** P0 orchestration endpoints are implemented. The CLI wrapper and granular node/edge editing are still planned.
 
 ## Design goals
 
@@ -21,7 +21,7 @@ Configurable via `PI_ORCHESTRA_PORT` / `PI_ORCHESTRA_URL`.
 
 ---
 
-## Implemented today (standalone)
+## Implemented today
 
 ### Info & health
 
@@ -53,6 +53,31 @@ DELETE /api/workflows/:id
 
 Saving a workflow does **not** load it into PtyHub — use orchestration endpoints below.
 
+### Orchestration boards (live backend state)
+
+Prefix: `/api/v1/orchestra`
+
+```http
+POST /api/v1/orchestra/boards          { cwd: string, label?: string }
+GET  /api/v1/orchestra/boards
+DELETE /api/v1/orchestra/boards/:boardId
+
+PUT /api/v1/orchestra/boards/:boardId/graph    WorkflowGraph
+GET /api/v1/orchestra/boards/:boardId/graph
+
+POST /api/v1/orchestra/boards/:boardId/run     { nodeId?: string, message: string }
+POST /api/v1/orchestra/boards/:boardId/stop
+GET  /api/v1/orchestra/boards/:boardId/status
+
+POST /api/v1/orchestra/boards/:boardId/nodes/:nodeId/stop
+POST /api/v1/orchestra/boards/:boardId/nodes/:nodeId/inject   { message: string }
+POST /api/v1/orchestra/boards/:boardId/nodes/:nodeId/input    { data: string }
+
+POST /api/v1/orchestra/flows                   { name, cwd, graph, message, wait?, waitTimeoutMs? }
+```
+
+Boards are persisted in SQLite, so they survive a backend restart. `cwd` and any `graph.cwd` are validated to be existing directories.
+
 ### Path validation
 
 ```http
@@ -69,7 +94,7 @@ POST /internal/card-status  { boardId, column }
 
 ---
 
-## Planned — Orchestration REST API
+## Orchestration REST API details
 
 Prefix: `/api/v1/orchestra`
 
@@ -98,34 +123,15 @@ GET /api/v1/orchestra/boards/:boardId/graph
 → WorkflowGraph
 ```
 
-Equivalent WebSocket command today: `{ type: "load_graph", graph, cwd }`.
-
-### Nodes
-
-```http
-POST /api/v1/orchestra/boards/:boardId/nodes
-Body: { label, promptId, promptOverride?, position?: {x,y} }
-→ { nodeId, ... }
-
-DELETE /api/v1/orchestra/boards/:boardId/nodes/:nodeId
-→ { ok: true }
-
-POST /api/v1/orchestra/boards/:boardId/edges
-Body: { sourceNodeId, targetNodeId }
-→ { edgeId }
-
-DELETE /api/v1/orchestra/boards/:boardId/edges/:edgeId
-→ { ok: true }
-```
+Equivalent WebSocket command: `{ type: "load_graph", graph, cwd }`.
 
 ### Execution
 
 ```http
 POST /api/v1/orchestra/boards/:boardId/run
 Body: {
-  nodeId: string,          # entry node (or explicit target)
-  message: string,         # initial task
-  trackKanban?: boolean
+  nodeId?: string,         # defaults to entryNodeId
+  message: string,
 }
 → { ok: true, boardId, nodeId }
 
@@ -154,6 +160,8 @@ POST /api/v1/orchestra/boards/:boardId/nodes/:nodeId/stop
 GET /api/v1/orchestra/boards/:boardId/status
 → {
   boardId,
+  cwd,
+  label,
   nodes: [{ nodeId, label, status, startedAt? }],
   edges: [{ sourceNodeId, targetNodeId }]
 }
@@ -166,19 +174,66 @@ POST /api/v1/orchestra/flows
 Body: {
   name: string,
   cwd: string,
-  entryNodeId: string,
+  entryNodeId?: string,
   graph: WorkflowGraph,
   message: string,
-  wait?: boolean              # block until entry node PTY exits
+  wait?: boolean,              # block until entry node PTY exits
+  waitTimeoutMs?: number
 }
 → {
   ok: true,
   boardId,
   flowId,
   status: "running" | "done",
-  summary?: string
+  nodeId,
+  timedOut?: boolean
 }
 ```
+
+Example:
+
+```bash
+curl -s http://localhost:3847/api/v1/orchestra/flows \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "Implement auth",
+    "cwd": "/path/to/repo",
+    "graph": {
+      "name": "auth flow",
+      "nodes": [
+        { "id": "arch", "label": "Architect", "promptId": "builtin-architect", "position": { "x": 0, "y": 0 } },
+        { "id": "dev", "label": "Developer", "promptId": "builtin-developer", "position": { "x": 300, "y": 0 } }
+      ],
+      "edges": [
+        { "id": "e1", "sourceNodeId": "arch", "targetNodeId": "dev" }
+      ],
+      "entryNodeId": "arch"
+    },
+    "message": "Design and implement the auth module",
+    "wait": true,
+    "waitTimeoutMs": 120000
+  }'
+```
+
+---
+
+## Auth
+
+Standalone localhost deployments can run with no auth (default). For remote embeds, set the environment variable:
+
+```bash
+PI_ORCHESTRA_TOKEN=<shared-secret>
+```
+
+When set, every `/api/v1/orchestra/*` request must include one of:
+
+```http
+X-Pi-Orchestra-Token: <shared-secret>
+# or
+Authorization: Bearer <shared-secret>
+```
+
+Missing or invalid tokens receive `401 Unauthorized`.
 
 ---
 
@@ -207,7 +262,7 @@ Prefer WebSocket for:
 
 Prefer REST for:
 
-- CRUD workflows/prompts
+- CRUD workflows/prompts/boards
 - CI one-shot `flows` creation
 - host integrations without persistent socket
 
@@ -264,28 +319,13 @@ interface WorkflowNode {
 
 ---
 
-## Auth (future)
-
-Standalone v1: no auth (localhost only).
-
-For remote hosts:
-
-```
-Authorization: Bearer <token>
-# or
-X-Pi-Orchestra-Token: <shared-secret>
-```
-
-Hermes/OpenClaw plugins would inject the token when opening the Orchestra tab.
-
----
-
 ## Implementation priority
 
-| Endpoint group | Priority | Reason |
+| Endpoint group | Priority | Status |
 |----------------|----------|--------|
-| `PUT .../graph` + `POST .../run` | P0 | Unblocks all host tabs |
-| `GET .../status` | P0 | Host health display |
-| `POST /flows` | P1 | CI one-shot |
-| CLI | P2 | Scripting ergonomics |
-| Auth | P2 | Remote dashboard embed |
+| Boards + graph + run + status | P0 | ✅ Implemented |
+| Node stop / inject / input | P0 | ✅ Implemented |
+| Auth token | P0 | ✅ Implemented |
+| `POST /flows` | P1 | ✅ Implemented |
+| CLI wrapper | P2 | 🔜 Planned |
+| Granular node/edge CRUD | P2 | 🔜 Planned |

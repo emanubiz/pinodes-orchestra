@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { SystemPromptRow, WorkflowGraph } from "../types.js";
+import type { BoardRow, BoardState, SystemPromptRow, WorkflowGraph } from "../types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // PI_ORCHESTRA_ROOT: bundled assets (prompts). Defaults to repo root.
@@ -44,6 +44,15 @@ function initSchema(): void {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       graph_data TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS boards (
+      id TEXT PRIMARY KEY,
+      cwd TEXT NOT NULL,
+      label TEXT NOT NULL,
+      graph_data TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -166,5 +175,55 @@ export function saveWorkflow(graph: WorkflowGraph): WorkflowGraph {
 
 export function deleteWorkflow(id: string): boolean {
   const r = getDb().prepare("DELETE FROM workflows WHERE id = ?").run(id);
+  return r.changes > 0;
+}
+
+function boardRowToState(row: BoardRow): BoardState {
+  return {
+    boardId: row.id,
+    cwd: row.cwd,
+    label: row.label,
+    graph: row.graph_data ? (JSON.parse(row.graph_data) as WorkflowGraph) : undefined,
+    createdAt: new Date(row.created_at).getTime(),
+  };
+}
+
+export function createBoard(id: string, cwd: string, label: string): BoardState {
+  const name = label ?? cwd.split("/").filter(Boolean).pop() ?? "board";
+  getDb()
+    .prepare(
+      `INSERT INTO boards (id, cwd, label) VALUES (?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET cwd=excluded.cwd, label=excluded.label, updated_at=datetime('now')`,
+    )
+    .run(id, cwd, name);
+  return getBoard(id)!;
+}
+
+export function listBoards(): BoardState[] {
+  const rows = getDb()
+    .prepare("SELECT * FROM boards ORDER BY updated_at DESC")
+    .all() as BoardRow[];
+  return rows.map(boardRowToState);
+}
+
+export function getBoard(id: string): BoardState | undefined {
+  const row = getDb().prepare("SELECT * FROM boards WHERE id = ?").get(id) as BoardRow | undefined;
+  if (!row) return undefined;
+  return boardRowToState(row);
+}
+
+export function saveBoardGraph(id: string, graph: WorkflowGraph): BoardState | undefined {
+  const existing = getBoard(id);
+  if (!existing) return undefined;
+  getDb()
+    .prepare(
+      `UPDATE boards SET graph_data = ?, updated_at = datetime('now') WHERE id = ?`,
+    )
+    .run(JSON.stringify(graph), id);
+  return getBoard(id)!;
+}
+
+export function deleteBoard(id: string): boolean {
+  const r = getDb().prepare("DELETE FROM boards WHERE id = ?").run(id);
   return r.changes > 0;
 }

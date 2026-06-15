@@ -5,6 +5,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { useRuntimeStore } from "../stores/runtimeStore";
 import { onPtyExit, onPtyOutput } from "../lib/ptyBus";
+import { fitWhenReady } from "../lib/termFit";
 
 interface TerminalPanelProps {
   boardId: string;
@@ -57,30 +58,23 @@ export function TerminalPanel({ boardId, send }: TerminalPanelProps) {
 
     const onData = term.onData((data) => send({ type: "pty_input", nodeId: selectedNodeId, data }));
 
-    const frame = requestAnimationFrame(() => {
-      try {
-        fit.fit();
-      } catch {
-        /* container not measured yet */
-      }
-      send({ type: "attach_node", nodeId: selectedNodeId, cols: term.cols, rows: term.rows });
-    });
+    // Attach immediately with a safe default size so the backend PTY is never
+    // spawned at 1 column while the sidebar is still being laid out.
+    send({ type: "attach_node", nodeId: selectedNodeId, cols: 80, rows: 24 });
 
-    const ro = new ResizeObserver(() => {
-      try {
-        fit.fit();
-        send({ type: "pty_resize", nodeId: selectedNodeId, cols: term.cols, rows: term.rows });
-      } catch {
-        /* mid-teardown */
-      }
-    });
-    ro.observe(host);
+    const unsubscribeFit = fitWhenReady(
+      term,
+      fit,
+      host,
+      (cols, rows) => {
+        send({ type: "pty_resize", nodeId: selectedNodeId, cols, rows });
+      },
+    );
 
     term.focus();
 
     return () => {
-      cancelAnimationFrame(frame);
-      ro.disconnect();
+      unsubscribeFit();
       onData.dispose();
       unsubOut();
       unsubExit();

@@ -25,7 +25,7 @@ export function attachWebSocket(ws: WebSocket): void {
 
   ws.on("close", () => clients.delete(ws));
 
-  ws.on("message", (raw) => {
+  ws.on("message", (raw: Buffer | string) => {
     try {
       const text = typeof raw === "string" ? raw : raw.toString();
       const msg = JSON.parse(text) as Record<string, unknown>;

@@ -5,6 +5,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { onPtyExit, onPtyOutput } from "../lib/ptyBus";
 import { TERM_FONT, TERM_THEME } from "../lib/termTheme";
+import { fitWhenReady } from "../lib/termFit";
 
 interface TerminalOverlayProps {
   boardId: string;
@@ -45,25 +46,15 @@ export function TerminalOverlay({ boardId, nodeId, label, send, onClose }: Termi
     });
     const onData = term.onData((data) => send({ type: "pty_input", nodeId, data }));
 
-    const frame = requestAnimationFrame(() => {
-      try {
-        fit.fit();
-      } catch {
-        /* not measured */
-      }
-      send({ type: "attach_node", nodeId, cols: term.cols, rows: term.rows });
-      term.focus();
+    // Attach immediately with a safe default size; resize once the overlay is
+    // laid out so the PTY is never at 1 column.
+    send({ type: "attach_node", nodeId, cols: 80, rows: 24 });
+
+    const unsubscribeFit = fitWhenReady(term, fit, host, (cols, rows) => {
+      send({ type: "pty_resize", nodeId, cols, rows });
     });
 
-    const ro = new ResizeObserver(() => {
-      try {
-        fit.fit();
-        send({ type: "pty_resize", nodeId, cols: term.cols, rows: term.rows });
-      } catch {
-        /* mid-teardown */
-      }
-    });
-    ro.observe(host);
+    term.focus();
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -71,9 +62,8 @@ export function TerminalOverlay({ boardId, nodeId, label, send, onClose }: Termi
     window.addEventListener("keydown", onKey);
 
     return () => {
-      cancelAnimationFrame(frame);
       window.removeEventListener("keydown", onKey);
-      ro.disconnect();
+      unsubscribeFit();
       onData.dispose();
       unsubOut();
       unsubExit();

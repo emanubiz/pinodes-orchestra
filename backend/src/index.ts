@@ -16,6 +16,7 @@ import {
   updatePrompt,
 } from "./db/index.js";
 import { ptyHub } from "./pty/PtyHub.js";
+import { orchestraRoutes } from "./routes/orchestra.js";
 import type { WorkflowGraph } from "./types.js";
 import { attachWebSocket } from "./ws/handler.js";
 
@@ -113,6 +114,9 @@ app.delete<{ Params: { id: string } }>("/api/workflows/:id", async (req, reply) 
   if (!deleteWorkflow(req.params.id)) return reply.code(404).send({ error: "Not found" });
   return { ok: true };
 });
+
+// Programmatic orchestration API for host integrations (VSCode, Hermes, OpenClaw, CI).
+await app.register(orchestraRoutes, { prefix: "/api/v1/orchestra" });
 
 app.register(async (f) => {
   f.get("/ws", { websocket: true }, (socket) => {

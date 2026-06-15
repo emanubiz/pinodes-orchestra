@@ -1,9 +1,10 @@
+import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pty, { type IPty } from "node-pty";
 import { getPrompt } from "../db/index.js";
-import type { WorkflowEdge, WorkflowGraph, WorkflowNode } from "../types.js";
+import type { NodeStatus, WorkflowEdge, WorkflowGraph, WorkflowNode } from "../types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MAX_BUFFER = 256_000; // scrollback kept per node for re-attach
@@ -71,6 +72,7 @@ export class PtyHub {
   private pending = new Map<string, { cols: number; rows: number }>();
   private kanbanBoards = new Set<string>();
   private cmd = resolvePiCommand();
+  private events = new EventEmitter();
 
   setBroadcast(fn: BroadcastFn): void {
     this.broadcast = fn;
@@ -289,6 +291,7 @@ export class PtyHub {
       if (this.sessions.get(k) === session) this.sessions.delete(k);
       this.broadcast({ type: "pty_exit", boardId, nodeId, code: exitCode });
       this.broadcast({ type: "node_status", boardId, nodeId, status: "idle" });
+      this.events.emit(`exit:${boardId}:${nodeId}`, exitCode ?? null);
     });
   }
 
@@ -440,6 +443,63 @@ export class PtyHub {
         this.kill(boardId, nodeId);
       }
     }
+  }
+
+  /** Whether a node currently has a running pi session. */
+  isNodeRunning(boardId: string, nodeId: string): boolean {
+    return this.sessions.has(key(boardId, nodeId));
+  }
+
+  /** Return status and start time for every node on a board. */
+  getNodeStatuses(
+    boardId: string,
+  ): Array<{ nodeId: string; label: string; status: NodeStatus; startedAt?: number }> {
+    const graph = this.graphs.get(boardId);
+    if (!graph) return [];
+    return [...graph.nodes.values()].map((n) => {
+      const s = this.sessions.get(key(boardId, n.id));
+      return {
+        nodeId: n.id,
+        label: n.label,
+        status: s ? "running" : "idle",
+        startedAt: s?.startedAt,
+      };
+    });
+  }
+
+  /** Return the edges of the loaded graph for a board. */
+  getEdges(boardId: string): WorkflowEdge[] {
+    return this.graphs.get(boardId)?.edges ?? [];
+  }
+
+  /**
+   * Wait for a node's pi session to exit. Resolves immediately if the node is
+   * not running. Returns `{ timedOut: true }` if the timeout fires first.
+   */
+  waitForExit(
+    boardId: string,
+    nodeId: string,
+    timeoutMs = 120_000,
+  ): Promise<{ code: number | null; timedOut: boolean }> {
+    const k = key(boardId, nodeId);
+    if (!this.sessions.has(k)) {
+      return Promise.resolve({ code: null, timedOut: false });
+    }
+    return new Promise((resolve) => {
+      const eventName = `exit:${boardId}:${nodeId}`;
+      const timer =
+        timeoutMs > 0
+          ? setTimeout(() => {
+              this.events.off(eventName, handler);
+              resolve({ code: null, timedOut: true });
+            }, timeoutMs)
+          : null;
+      const handler = (code: number | null) => {
+        if (timer) clearTimeout(timer);
+        resolve({ code, timedOut: false });
+      };
+      this.events.once(eventName, handler);
+    });
   }
 }
 
