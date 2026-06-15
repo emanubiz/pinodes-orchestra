@@ -9,6 +9,7 @@ import { KanbanBoard } from "./components/KanbanBoard";
 import { PromptLibrary } from "./components/PromptLibrary";
 import { WorkflowPicker } from "./components/WorkflowPicker";
 import { NodeInspector } from "./components/NodeInspector";
+import { SystemPromptModal } from "./components/SystemPromptModal";
 import { useOrchestraWs } from "./hooks/useOrchestraWs";
 import { useBoardStore } from "./stores/boardStore";
 import { graphFromFlow, useRuntimeStore } from "./stores/runtimeStore";
@@ -19,6 +20,7 @@ export function App() {
   const flowRef = useRef<FlowCanvasHandle | null>(null);
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [overlayNodeId, setOverlayNodeId] = useState<string | null>(null);
+  const [promptEditNodeId, setPromptEditNodeId] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [view, setView] = useState<"agents" | "kanban">("agents");
 
@@ -179,6 +181,7 @@ export function App() {
         status: "idle" as const,
         promptOverride: n.promptOverride ?? undefined,
         isEntry: n.id === graph.entryNodeId,
+        canBeFinal: n.canBeFinal ?? undefined,
       },
     }));
     const edges: Edge[] = graph.edges.map((e) => ({
@@ -226,6 +229,9 @@ export function App() {
   };
 
   const overlayNode = overlayNodeId ? flowRef.current?.getNode(overlayNodeId) : undefined;
+  const promptEditNode = promptEditNodeId
+    ? flowRef.current?.getNode(promptEditNodeId)
+    : undefined;
 
   return (
     <div className="relative flex h-full flex-col">
@@ -368,6 +374,7 @@ export function App() {
                 flowRef={flowRef}
                 send={send}
                 onExpand={setOverlayNodeId}
+                onEditPrompt={setPromptEditNodeId}
               />
             </div>
 
@@ -410,6 +417,21 @@ export function App() {
           label={overlayNode?.data.label ?? "pi"}
           send={send}
           onClose={() => setOverlayNodeId(null)}
+        />
+      )}
+
+      {promptEditNodeId && promptEditNode && (
+        <SystemPromptModal
+          label={promptEditNode.data.label}
+          data={promptEditNode.data}
+          onSave={(promptOverride) => {
+            flowRef.current?.updateNodeData(promptEditNodeId, { promptOverride });
+            scheduleSync(
+              flowRef.current?.getNodes() ?? [],
+              flowRef.current?.getEdges() ?? [],
+            );
+          }}
+          onClose={() => setPromptEditNodeId(null)}
         />
       )}
     </div>

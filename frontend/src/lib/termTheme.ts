@@ -18,6 +18,10 @@ export interface TerminalBridge {
   send: (msg: Record<string, unknown>) => void;
   onExpand: (nodeId: string) => void;
   onDelete: (nodeId: string) => void;
+  /** Open the system-prompt viewer/editor for a node. */
+  onEditPrompt: (nodeId: string) => void;
+  /** Flip whether a node is allowed to end the chain. */
+  onToggleFinal: (nodeId: string) => void;
 }
 
 export const TerminalContext = createContext<TerminalBridge | null>(null);

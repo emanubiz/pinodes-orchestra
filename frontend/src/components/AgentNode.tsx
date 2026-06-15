@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { Maximize2, Trash2 } from "lucide-react";
+import { Flag, FlagOff, Maximize2, ScrollText, Trash2 } from "lucide-react";
 import type { WorkflowNodeData, NodeStatus } from "../types";
 import { NodeTerminal } from "./NodeTerminal";
 import { useTerminalBridge } from "../lib/termTheme";
@@ -23,7 +23,9 @@ const statusBar: Record<NodeStatus, string> = {
 
 function AgentNodeComponent({ id, data, selected }: NodeProps & { data: WorkflowNodeData }) {
   const status = data.status ?? "idle";
-  const { onExpand, onDelete } = useTerminalBridge();
+  const { onExpand, onDelete, onEditPrompt, onToggleFinal } = useTerminalBridge();
+  // Undefined === can end (preserves old graphs); only an explicit false forces a hand-off.
+  const canBeFinal = data.canBeFinal !== false;
 
   // Selection wins the bar; then live status; an entry node gets a soft amber rest state.
   const bar = selected
@@ -52,7 +54,18 @@ function AgentNodeComponent({ id, data, selected }: NodeProps & { data: Workflow
       />
 
       {/* header */}
-      <div className="flex items-center gap-2 border-b border-zinc-800/80 px-2.5 py-1.5">
+      <div className="flex items-center gap-1.5 border-b border-zinc-800/80 px-2.5 py-1.5">
+        <button
+          type="button"
+          className="nodrag shrink-0 rounded p-0.5 text-zinc-500 transition-colors hover:bg-white/5 hover:text-zinc-200"
+          title="View / edit system prompt"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEditPrompt(id);
+          }}
+        >
+          <ScrollText size={12} strokeWidth={2} />
+        </button>
         <span
           className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusDot[status]} ${
             status === "running" ? "live-dot" : ""
@@ -60,6 +73,25 @@ function AgentNodeComponent({ id, data, selected }: NodeProps & { data: Workflow
           title={status === "error" && data.error ? data.error : status}
         />
         <span className="flex-1 truncate text-xs font-medium text-zinc-300">{data.label}</span>
+        <button
+          type="button"
+          className={`nodrag shrink-0 rounded p-0.5 transition-colors hover:bg-white/5 ${
+            canBeFinal
+              ? "text-emerald-400/80 hover:text-emerald-300"
+              : "text-amber-400/80 hover:text-amber-300"
+          }`}
+          title={
+            canBeFinal
+              ? "Può essere nodo finale (può chiudere il giro). Click: forza l'hand-off."
+              : "Deve passare la palla a un nodo collegato. Click: consenti la chiusura."
+          }
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleFinal(id);
+          }}
+        >
+          {canBeFinal ? <Flag size={12} strokeWidth={2} /> : <FlagOff size={12} strokeWidth={2} />}
+        </button>
         {data.isEntry && (
           <span
             className="text-[9px] font-medium uppercase tracking-wider text-amber-400/70"

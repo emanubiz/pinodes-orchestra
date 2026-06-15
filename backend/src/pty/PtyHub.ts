@@ -90,8 +90,23 @@ export class PtyHub {
 
   /** Store node + edge metadata and cwd for a board. Kills terminals of removed nodes. */
   setGraph(boardId: string, graph: WorkflowGraph, cwd: string): void {
+    const prev = this.graphs.get(boardId);
     const nodes = new Map(graph.nodes.map((n) => [n.id, n]));
     this.graphs.set(boardId, { cwd, nodes, edges: graph.edges ?? [] });
+    // Live finality toggle: if a node's canBeFinal flipped while its pi is
+    // running, tell the agent the rule changed so it adapts mid-flow (e.g. it
+    // was forced to hand off, now it may close the loop if the ball returns).
+    if (prev) {
+      for (const [id, node] of nodes) {
+        const before = prev.nodes.get(id);
+        if (!before) continue;
+        const wasFinal = before.canBeFinal !== false;
+        const nowFinal = node.canBeFinal !== false;
+        if (wasFinal !== nowFinal && this.sessions.has(key(boardId, id))) {
+          this.notifyFinalityChange(boardId, id, nowFinal);
+        }
+      }
+    }
     for (const k of [...this.sessions.keys()]) {
       const [b, nodeId] = k.split(":");
       if (b === boardId && !nodes.has(nodeId)) this.kill(boardId, nodeId);
@@ -153,6 +168,11 @@ export class PtyHub {
     return map;
   }
 
+  /** Whether a node is allowed to end the chain (undefined/null === yes). */
+  private canBeFinal(boardId: string, nodeId: string): boolean {
+    return this.graphs.get(boardId)?.nodes.get(nodeId)?.canBeFinal !== false;
+  }
+
   /** System-prompt appendix telling an agent which nodes it may hand off to. */
   private connectionsAppendix(boardId: string, nodeId: string): string {
     const targets = this.outgoingTargets(boardId, nodeId);
@@ -164,14 +184,21 @@ export class PtyHub {
     }
     const handles = this.handles(boardId);
     const lines = targets.map((t) => `- ${handles.get(t.id)} — ${t.label}`).join("\n");
+    // A non-final node must always pass the ball downstream; a final-capable one
+    // may close the chain when its part truly finishes the task.
+    const endingRule = this.canBeFinal(boardId, nodeId)
+      ? "- Ending is allowed: if your part finishes the task and nothing is left for a downstream " +
+        "agent (e.g. a final review you approve), just don't write a hand-off block.\n"
+      : "- You are NOT a terminal node: you must NEVER end the chain yourself. When your part is " +
+        "done you are REQUIRED to hand off to one of the connected agents below — always close " +
+        "your message with a @@HANDOFF block. (This rule can be lifted later at runtime.)\n";
     return (
       "\n\n## Orchestration — you are one link in a pipeline of agents\n" +
       "CORE RULE: this runs as a pipeline — do your part, then hand the next step to the " +
       "connected agent that owns it. Absorbing the whole job yourself defeats the point of the pipeline.\n" +
       "- When your part is done and a downstream agent owns the next step, hand off to it. " +
       "This is the expected default — don't silently take over their work.\n" +
-      "- Ending is allowed: if your part finishes the task and nothing is left for a downstream " +
-      "agent (e.g. a final review you approve), just don't write a hand-off block.\n" +
+      endingRule +
       "- You *may* do some of another agent's work yourself if it is genuinely warranted, but " +
       "that is the exception, not the default — prefer delegating the next step.\n\n" +
       "Agents you can hand work off to (outgoing) — use the handle on the left as the recipient:\n" +
@@ -393,6 +420,21 @@ export class PtyHub {
    */
   injectTask(boardId: string, nodeId: string, message: string): void {
     this.scheduleInject(boardId, nodeId, message);
+  }
+
+  /**
+   * Tell an already-running node that its finality rule changed. No-op if it has
+   * no outgoing edges (finality is meaningless without somewhere to hand off).
+   */
+  private notifyFinalityChange(boardId: string, nodeId: string, canBeFinal: boolean): void {
+    if (!this.sessions.has(key(boardId, nodeId))) return;
+    if (this.outgoingTargets(boardId, nodeId).length === 0) return;
+    const message = canBeFinal
+      ? "[orchestra] Rule update: you are NOW allowed to end the chain. If the work is truly " +
+        "complete and nothing is left for a downstream agent, you may finish without a @@HANDOFF block."
+      : "[orchestra] Rule update: you are NO LONGER allowed to end the chain. When your current " +
+        "part is done you MUST hand off to a connected agent — always close with a @@HANDOFF block.";
+    this.inject(boardId, nodeId, message);
   }
 
   /** Ensure the node is running, then inject once its pi has had time to boot. */

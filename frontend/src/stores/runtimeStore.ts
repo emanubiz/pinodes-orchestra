@@ -134,6 +134,7 @@ export function graphFromFlow(
       label: string;
       promptId: string;
       promptOverride?: string;
+      canBeFinal?: boolean;
     };
   }>,
   edges: Array<{ id: string; source: string; target: string }>,
@@ -152,6 +153,7 @@ export function graphFromFlow(
       label: n.data.label,
       promptId: n.data.promptId,
       promptOverride: n.data.promptOverride ?? null,
+      canBeFinal: n.data.canBeFinal ?? null,
       position: n.position,
     })),
     edges: edges.map((e) => ({

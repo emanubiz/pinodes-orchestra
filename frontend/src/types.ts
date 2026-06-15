@@ -13,6 +13,9 @@ export interface WorkflowNodeData extends Record<string, unknown> {
   status: NodeStatus;
   promptOverride?: string;
   isEntry?: boolean;
+  /** Whether this node is allowed to end the chain. Undefined === true (can end).
+   * When false, the agent is told it MUST hand off to a connected node. */
+  canBeFinal?: boolean;
   error?: string;
 }
 
@@ -34,6 +37,7 @@ export interface WorkflowGraph {
     label: string;
     promptId: string;
     promptOverride?: string | null;
+    canBeFinal?: boolean | null;
     position: { x: number; y: number };
   }>;
   edges: Array<{

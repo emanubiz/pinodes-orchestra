@@ -52,6 +52,7 @@ interface FlowCanvasProps {
   flowRef: React.MutableRefObject<FlowCanvasHandle | null>;
   send: (msg: Record<string, unknown>) => void;
   onExpand: (nodeId: string) => void;
+  onEditPrompt: (nodeId: string) => void;
 }
 
 function snapshotToFlow(
@@ -86,6 +87,7 @@ export function FlowCanvas({
   flowRef,
   send,
   onExpand,
+  onEditPrompt,
 }: FlowCanvasProps) {
   const initial = useMemo(
     () => snapshotToFlow(initialSnapshot, entryNodeId),
@@ -178,6 +180,21 @@ export function FlowCanvas({
     [setNodes, setEdges, selectedNodeId, setSelectedNodeId],
   );
 
+  // Flip canBeFinal. The graph-change effect above re-syncs to the backend, so a
+  // live toggle reaches a running node (which then learns it may/ must end).
+  const onToggleFinal = useCallback(
+    (nodeId: string) => {
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === nodeId
+            ? { ...n, data: { ...n.data, canBeFinal: n.data.canBeFinal === false } }
+            : n,
+        ),
+      );
+    },
+    [setNodes],
+  );
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.key === "Delete" || e.key === "Backspace") && selectedNodeId) {
@@ -195,7 +212,9 @@ export function FlowCanvas({
   }, [selectedNodeId, setNodes, setEdges, setSelectedNodeId]);
 
   return (
-    <TerminalContext.Provider value={{ boardId, send, onExpand, onDelete: onDeleteNode }}>
+    <TerminalContext.Provider
+      value={{ boardId, send, onExpand, onDelete: onDeleteNode, onEditPrompt, onToggleFinal }}
+    >
     <div className="h-full w-full">
       <ReactFlow
         nodes={nodes}
@@ -251,6 +270,7 @@ export function flowToSnapshot(
         status: n.data.status ?? "idle",
         promptOverride: n.data.promptOverride,
         isEntry: n.data.isEntry,
+        canBeFinal: n.data.canBeFinal,
       },
     })),
     edges: edges.map((e) => ({ id: e.id, source: e.source, target: e.target })),

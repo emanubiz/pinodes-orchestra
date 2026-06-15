@@ -14,6 +14,9 @@ export interface WorkflowNode {
   label: string;
   promptId: string;
   promptOverride?: string | null;
+  /** Whether this node may end the chain. Undefined/null === true (can end).
+   * When false, the agent is told it MUST hand off to a connected node. */
+  canBeFinal?: boolean | null;
   position: { x: number; y: number };
 }
 
