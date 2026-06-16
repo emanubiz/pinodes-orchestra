@@ -14,6 +14,7 @@ import { useOrchestraWs } from "./hooks/useOrchestraWs";
 import { useBoardStore } from "./stores/boardStore";
 import { graphFromFlow, useRuntimeStore } from "./stores/runtimeStore";
 import { api } from "./lib/api";
+import { IS_EMBEDDED, EMBED_CWD } from "./lib/embed";
 import type { SystemPrompt, WorkflowGraph, WorkflowNodeData } from "./types";
 
 export function App() {
@@ -40,6 +41,7 @@ export function App() {
   const updateBoardSnapshot = useBoardStore((s) => s.updateBoardSnapshot);
   const setActiveBoard = useBoardStore((s) => s.setActiveBoard);
   const setDefaultCwd = useBoardStore((s) => s.setDefaultCwd);
+  const bindWorkspace = useBoardStore((s) => s.bindWorkspace);
 
   const { send } = useOrchestraWs(activeBoard.id);
   const connected = useRuntimeStore((s) => s.connected);
@@ -49,6 +51,12 @@ export function App() {
   const clearBoardRuntime = useRuntimeStore((s) => s.clearBoardRuntime);
 
   useEffect(() => {
+    // Embedded host (VS Code) provides the workspace cwd directly: bind the
+    // single board to it and skip the standalone defaultCwd discovery.
+    if (IS_EMBEDDED && EMBED_CWD) {
+      bindWorkspace(EMBED_CWD);
+      return;
+    }
     void fetch(api("/api/info"))
       .then((r) => r.json())
       .then((data: { defaultCwd?: string }) => {
@@ -57,7 +65,7 @@ export function App() {
       .catch(() => {
         /* backend offline — BoardTabs will use "." */
       });
-  }, [setDefaultCwd]);
+  }, [setDefaultCwd, bindWorkspace]);
 
   useEffect(() => {
     setActiveBoardId(activeBoard.id);
@@ -358,7 +366,7 @@ export function App() {
         />
       ) : (
       <div className="flex flex-1 min-h-0">
-        <BoardTabs onBoardSwitch={handleBoardSwitch} />
+        {!IS_EMBEDDED && <BoardTabs onBoardSwitch={handleBoardSwitch} />}
 
         <div className="flex flex-1 flex-col min-w-0">
           <PromptLibrary prompts={prompts} onRefresh={loadPrompts} onAddNode={addNodeFromPrompt} />

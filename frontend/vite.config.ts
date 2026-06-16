@@ -9,7 +9,9 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
-      injectRegister: "auto",
+      // Registration is done manually in main.tsx so we can skip it (and tear
+      // down any existing SW) when embedded in a host like the VS Code webview.
+      injectRegister: null,
       manifest: {
         name: "pi-orchestra",
         short_name: "pi-orchestra",

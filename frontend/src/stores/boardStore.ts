@@ -30,6 +30,7 @@ interface BoardState {
   defaultCwd: string | null;
 
   setDefaultCwd: (cwd: string) => void;
+  bindWorkspace: (cwd: string, label?: string) => void;
   setActiveBoard: (id: string) => void;
   addBoard: (cwd: string, label?: string) => Board;
   removeBoard: (id: string) => void;
@@ -52,6 +53,16 @@ export const useBoardStore = create<BoardState>()(
           const upgraded = { ...boards[0], cwd, label: boards[0].label === "repo" ? cwd.split("/").filter(Boolean).pop() ?? "repo" : boards[0].label };
           set({ boards: [upgraded] });
         }
+      },
+
+      // Embedded hosts (VS Code) own the project: collapse to a single board
+      // bound to the host cwd, reusing a persisted board for that cwd so the
+      // graph survives a panel reopen.
+      bindWorkspace: (cwd, label) => {
+        const { boards } = get();
+        const existing = boards.find((b) => b.cwd === cwd);
+        const board = existing ?? createBoard(cwd, label);
+        set({ boards: [board], activeBoardId: board.id, defaultCwd: cwd });
       },
 
       setActiveBoard: (id) => set({ activeBoardId: id }),
