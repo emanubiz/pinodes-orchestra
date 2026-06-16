@@ -8,15 +8,16 @@ import { useRuntimeStore } from "../stores/runtimeStore";
 /** Live, read-only mini view of a node's pi terminal, embedded in its card. */
 export function NodeTerminal({ nodeId }: { nodeId: string }) {
   const { boardId, send } = useTerminalBridge();
+  const cardRef = useRef<HTMLDivElement | null>(null);
   const hostRef = useRef<HTMLDivElement | null>(null);
-  const scaleRef = useRef<HTMLDivElement | null>(null);
   const termRef = useRef<Terminal | null>(null);
   const [live, setLive] = useState(false);
   const connected = useRuntimeStore((s) => s.connected);
 
   useEffect(() => {
+    const card = cardRef.current;
     const host = hostRef.current;
-    if (!host || !connected) return;
+    if (!card || !host || !connected) return;
     const key = `${boardId}:${nodeId}`;
 
     const term = new Terminal({
@@ -40,27 +41,23 @@ export function NodeTerminal({ nodeId }: { nodeId: string }) {
     // So we render the mirror at the PTY's exact cols/rows and scale it down with
     // CSS to fit the card — faithful, just smaller.
     //
-    // Scale lives on a wrapper, not on `.xterm` itself (xterm owns that element's
-    // inline dimensions). We use `zoom` (Chromium/VS Code webview) so the scaled
-    // box actually fills the card width; `transform: scale()` only paints smaller
-    // and leaves empty space on the right.
+    // We must scale by the TERMINAL GRID width, not the `.xterm` element width:
+    // `.xterm` stretches to fill its container, so measuring it yields the card
+    // width and the scale collapses to ~1 (the old "only fills part of the card"
+    // bug). `.xterm-screen` is sized to `cols × cellWidth` — the real content.
     const rescale = () => {
-      const scaleEl = scaleRef.current;
-      const xtermEl = host.querySelector(".xterm") as HTMLElement | null;
-      if (!scaleEl || !xtermEl) return;
-      const hostW = host.clientWidth;
-      if (!hostW) return;
-
-      scaleEl.style.zoom = "1";
-      const natW = xtermEl.offsetWidth;
-      if (!natW) return;
-
-      scaleEl.style.zoom = String(hostW / natW);
+      const cardW = card.clientWidth;
+      const screenEl = host.querySelector(".xterm-screen") as HTMLElement | null;
+      const natW = screenEl?.offsetWidth ?? 0;
+      if (!cardW || !natW) return;
+      const scale = cardW / natW;
+      host.style.transformOrigin = "top left";
+      host.style.transform = `scale(${scale})`;
     };
 
-    const scheduleRescale = () => {
+    // Two frames: one for xterm to relayout after a resize/write, one to measure.
+    const scheduleRescale = () =>
       requestAnimationFrame(() => requestAnimationFrame(rescale));
-    };
 
     const applySize = (cols: number, rows: number) => {
       if (cols > 0 && rows > 0 && (cols !== term.cols || rows !== term.rows)) {
@@ -76,12 +73,13 @@ export function NodeTerminal({ nodeId }: { nodeId: string }) {
       term.write(data, scheduleRescale);
     });
 
-    // Attach only to receive scrollback/replay (and the PTY size). Do NOT resize
-    // the shared PTY: the interactive terminal owns the dimensions.
-    send({ type: "attach_node", nodeId, cols: 80, rows: 24, spawn: false });
+    // Boot the node's pi on board load (spawn:true) so cards come alive without
+    // opening the side panel — but resize:false keeps the interactive terminal
+    // the sole owner of the shared PTY's dimensions.
+    send({ type: "attach_node", nodeId, cols: 80, rows: 24, spawn: true, resize: false });
 
     const ro = new ResizeObserver(scheduleRescale);
-    ro.observe(host);
+    ro.observe(card);
     scheduleRescale();
 
     return () => {
@@ -95,14 +93,9 @@ export function NodeTerminal({ nodeId }: { nodeId: string }) {
 
   // pointer-events off so dragging/clicking the node still works through it.
   return (
-    <div className="node-terminal-mirror relative h-full w-full overflow-hidden bg-black">
-      <div
-        ref={scaleRef}
-        className="inline-block origin-top-left"
-        style={{ transformOrigin: "top left" }}
-      >
-        <div ref={hostRef} style={{ pointerEvents: "none" }} />
-      </div>
+    <div ref={cardRef} className="node-terminal-mirror relative h-full w-full overflow-hidden bg-black">
+      {/* width:max-content so `.xterm` shrinks to the grid; we scale this box. */}
+      <div ref={hostRef} style={{ pointerEvents: "none", width: "max-content" }} />
       {!live && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-[10px] text-zinc-600">
           starting pi…

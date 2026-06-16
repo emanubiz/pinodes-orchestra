@@ -62,8 +62,11 @@ function handleMessage(ws: WebSocket, msg: Record<string, unknown>): void {
     case "attach_node": {
       const cols = (msg.cols as number) || 80;
       const rows = (msg.rows as number) || 24;
-      const spawnIfMissing = msg.spawn !== false; // mini terminals pass spawn:false
-      const buffer = ptyHub.ensure(boardId, nodeId, cols, rows, spawnIfMissing);
+      const spawnIfMissing = msg.spawn !== false; // mini terminals still spawn pi
+      // Read-only mirrors pass resize:false so they boot a node without claiming
+      // authority over the shared PTY's dimensions (the interactive panel owns those).
+      const allowResize = msg.resize !== false;
+      const buffer = ptyHub.ensure(boardId, nodeId, cols, rows, spawnIfMissing, allowResize);
       // Replay scrollback only to the requesting client, tagged with the PTY's
       // real size so read-only mirrors can render/scale it faithfully.
       const size = ptyHub.size(boardId, nodeId);

@@ -51,7 +51,7 @@ Status is driven by PTY lifecycle (`spawn` → `running`, `onExit` → `idle` / 
 
 There is no separate `steer` API: intervention is **terminal-native** — you type into the pi TUI like a normal console.
 
-**Terminal mirroring & PTY geometry.** Each node has a single backend PTY that can be viewed from two places: the read-only mini terminal on the node card and the interactive side-panel terminal. Both `attach_node` to the same session and replay its scrollback, but **only the interactive owner sizes the PTY** (`fit()` → `pty_resize`). Read-only mirrors attach with `spawn:false` and never resize — otherwise the PTY width would drift from the interactive xterm and pi's input line would wrap on every keystroke.
+**Terminal mirroring & PTY geometry.** Each node has a single backend PTY that can be viewed from two places: the read-only mini terminal on the node card and the interactive side-panel terminal. Both `attach_node` to the same session and replay its scrollback. The node-card mirrors attach with `spawn:true, resize:false` so a board's pi sessions **boot automatically on load** (no need to open the side panel), while **only the interactive owner sizes the PTY** (`fit()` → `pty_resize`); mirrors never resize — otherwise the PTY width would drift from the interactive xterm and pi's input line would wrap on every keystroke. Because the mirror renders pi's absolute-cursor TUI at the PTY's real `cols×rows`, it scales the grid to the card width by measuring `.xterm-screen` (the true grid, not the stretched `.xterm` container) and applying a CSS transform.
 
 ## Handoff protocol
 
@@ -150,7 +150,7 @@ pinodes-orchestra/
 | Command | Purpose |
 |---------|---------|
 | `load_graph` | Sync nodes/edges + cwd to PtyHub |
-| `attach_node` | Subscribe to scrollback; optionally spawn pi (`spawn:false` for read-only mirrors) |
+| `attach_node` | Subscribe to scrollback; spawn pi if missing (`spawn`), claim PTY resize authority (`resize`). Node-card mirrors pass `resize:false` |
 | `pty_input` | User keystrokes into pi |
 | `pty_resize` | Terminal geometry |
 | `inject_task` | Start flow at a node (Kanban / Run) |

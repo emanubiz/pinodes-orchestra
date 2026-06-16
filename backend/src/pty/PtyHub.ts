@@ -276,15 +276,17 @@ export class PtyHub {
     cols: number,
     rows: number,
     spawnIfMissing = true,
+    allowResize = spawnIfMissing,
   ): string {
     const k = key(boardId, nodeId);
     const existing = this.sessions.get(k);
     if (existing) {
-      // Only the interactive owner (spawnIfMissing) may resize the shared PTY.
-      // Read-only mirrors (the node-card mini terminals) must not fight it for
-      // dimensions: if they did, the PTY width would no longer match the
-      // interactive xterm and pi's input line would wrap on every keystroke.
-      if (spawnIfMissing && cols && rows && (cols !== existing.cols || rows !== existing.rows)) {
+      // Only the interactive owner may resize the shared PTY. Read-only mirrors
+      // (the node-card mini terminals) must not fight it for dimensions: if they
+      // did, the PTY width would no longer match the interactive xterm and pi's
+      // input line would wrap on every keystroke. Mirrors may still *spawn* a
+      // node (spawnIfMissing) without claiming resize authority (allowResize).
+      if (allowResize && cols && rows && (cols !== existing.cols || rows !== existing.rows)) {
         this.resize(boardId, nodeId, cols, rows);
       }
       return existing.buffer;
