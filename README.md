@@ -32,23 +32,36 @@ Backend serves `frontend/dist` on `http://localhost:3847`.
 
 In Chrome/Edge, use the browser **Install** action. The service worker caches static assets; agent execution still needs the backend running.
 
-## Run in VS Code
+## IDE extension (Cursor, Windsurf, VS Code, …)
 
-The repo ships a VS Code extension (`vscode-extension/`) that embeds the same
-canvas in an editor webview. It spawns the backend as a Node subprocess (no
-`node-pty`/SQLite in the extension host) and binds the board to the open
-workspace folder — no repo-tab switcher, since VS Code already owns the cwd.
+The same VS Code–compatible extension (`vscode-extension/`) embeds the canvas
+in an editor webview. It bundles a self-contained backend (native modules per
+platform) and binds the board to the open workspace folder — no repo-tab
+switcher, since the IDE already owns the cwd.
+
+**Recommended — install from Open VSX** (works out of the box in **Cursor**,
+**Windsurf**, and other VS Code–compatible editors):
+
+1. Extensions panel → search **PiNodes Orchestra** (publisher: `emanubiz`)
+2. Install → Activity Bar → **PiNodes Orchestra** → **Open PiNodes Orchestra**
+
+Open VSX listing: <https://open-vsx.org/extension/emanubiz/pinodes-orchestra-vscode>
+
+**VS Code (Marketplace or manual):** same extension ID
+(`emanubiz.pinodes-orchestra-vscode`). You can also sideload a `.vsix` if you
+prefer.
+
+**Build from source** (contributors / unreleased builds):
 
 ```bash
-# build the app the extension serves, then the extension itself
 npm run build
 cd vscode-extension && npm install && npm run compile
-npx @vscode/vsce package        # produces a .vsix
+npx @vscode/vsce package --target linux-x64   # pick your platform
 code --install-extension pinodes-orchestra-vscode-*.vsix
 ```
 
-Reload VS Code → **PiNodes Orchestra** in the Activity Bar → **Open PiNodes Orchestra**.
-See [`vscode-extension/README.md`](./vscode-extension/README.md) for details.
+Details: [`vscode-extension/README.md`](./vscode-extension/README.md),
+[`docs/EXTENSION_PUBLISHING.md`](./docs/EXTENSION_PUBLISHING.md).
 
 ## Requirements
 
@@ -82,7 +95,7 @@ See [`vscode-extension/README.md`](./vscode-extension/README.md) for details.
 | Doc | Contents |
 |-----|----------|
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Current system design, WS protocol, handoff |
-| [docs/EXTENSIONS_ROADMAP.md](./docs/EXTENSIONS_ROADMAP.md) | Host integrations — VS Code (done), Cursor, Hermes, OpenClaw |
+| [docs/EXTENSIONS_ROADMAP.md](./docs/EXTENSIONS_ROADMAP.md) | Host integrations — IDE extension (done), Hermes, OpenClaw |
 | [vscode-extension/README.md](./vscode-extension/README.md) | VS Code extension — how it works, build, settings |
 | [docs/HERMES_DESKTOP.md](./docs/HERMES_DESKTOP.md) | Hermes Desktop analysis |
 | [docs/PROGRAMMATIC_API.md](./docs/PROGRAMMATIC_API.md) | REST/CLI API for programmatic orchestration (boards, flows, auth) |
@@ -102,11 +115,14 @@ Details: [docs/PROGRAMMATIC_API.md](./docs/PROGRAMMATIC_API.md).
 
 ## Host integrations
 
-Standalone is the reference implementation. Hosts:
+Standalone (browser/PWA) is the reference implementation. Hosts:
 
-- **VS Code** — ✅ webview extension (`vscode-extension/`, see above)
-- **Cursor** — same architecture as VS Code (planned: native `runtime: "cursor"` nodes)
+- **Cursor / Windsurf / VS Code–compatible IDEs** — ✅ same extension via
+  [Open VSX](https://open-vsx.org/extension/emanubiz/pinodes-orchestra-vscode)
+  (see above)
+- **VS Code (Marketplace)** — ✅ same extension; optional if you already use Open VSX
 - **Hermes Desktop** — Orchestra tab via remote dashboard or embedded webview (planned)
 - **OpenClaw** — Orchestra tab via Gateway HTTP route or external WS client (planned)
 
+Native `runtime: "cursor"` agent nodes (beyond pi) remain on the roadmap.
 Details: [docs/EXTENSIONS_ROADMAP.md](./docs/EXTENSIONS_ROADMAP.md).

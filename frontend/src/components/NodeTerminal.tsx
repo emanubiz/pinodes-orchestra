@@ -42,9 +42,11 @@ export function NodeTerminal({ nodeId }: { nodeId: string }) {
     const rescale = () => {
       if (!xtermEl) return;
       const natW = xtermEl.offsetWidth;
-      const natH = xtermEl.offsetHeight;
-      if (!natW || !natH || !host.clientWidth || !host.clientHeight) return;
-      const scale = Math.min(host.clientWidth / natW, host.clientHeight / natH);
+      if (!natW || !host.clientWidth) return;
+      // Scale to card width (not Math.min width/height — that "contains" the PTY
+      // grid and leaves empty space on the right when the card is wider than the
+      // grid's aspect ratio). Clip overflow vertically; pi output is top-aligned.
+      const scale = host.clientWidth / natW;
       xtermEl.style.transformOrigin = "top left";
       xtermEl.style.transform = `scale(${scale})`;
     };

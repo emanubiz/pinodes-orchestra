@@ -90,9 +90,12 @@ Handoff: same `@@HANDOFF` block or structured `call_agent` if Cursor exposes it.
 
 ---
 
-### 2. VS Code extension — ✅ implemented (MVP)
+### 2. VS Code–compatible IDE extension — ✅ published (MVP)
 
-Lives in [`vscode-extension/`](../vscode-extension/README.md).
+Lives in [`vscode-extension/`](../vscode-extension/README.md). **One extension**
+serves VS Code, **Cursor**, **Windsurf**, and other forks via
+[Open VSX](https://open-vsx.org/extension/emanubiz/pinodes-orchestra-vscode)
+(and the VS Code Marketplace).
 
 **Placement:** Activity Bar → **PiNodes Orchestra** → control view (status + launcher) + a full editor-area webview panel (not the Agent Chat window).
 
@@ -111,7 +114,7 @@ VSCode Workbench
 |-----------|----------|--------|
 | UI | `createWebviewPanel` framing the backend-served UI in an iframe via `vscode.env.asExternalUri` | ✅ |
 | Transport | localhost HTTP/WS — frontend talks to the backend origin directly inside the iframe | ✅ |
-| Backend | spawned as a Node subprocess (`backend/dist/index.js`); adopts an already-running one | ✅ |
+| Backend | spawned as a Node subprocess from bundled `server/`; adopts an already-running one | ✅ |
 | cwd | `workspaceFolders[0]` passed as `?embed=vscode&cwd=…`; frontend binds the single board and hides the repo-tab switcher | ✅ |
 | Service worker | not registered in embedded mode (avoids stale-shell caching in the webview) | ✅ |
 | Native addons | no in-process `node-pty`/`better-sqlite3` — all in the subprocess | ✅ |
@@ -121,9 +124,11 @@ The embedded-mode contract lives in `frontend/src/lib/embed.ts` (reads `embed`/`
 
 **Still open:**
 
-- Bundle `backend/` + `frontend/dist` into the `.vsix` so it installs without a repo checkout (today the extension references the built backend via `pinodesOrchestra.backendEntry`).
 - Multi-root workspace handling (currently binds to the first folder).
 - Configurable port (the standalone frontend resolves its API same-origin only on `3847`).
+
+**Publish:** ✅ [Open VSX](https://open-vsx.org/extension/emanubiz/pinodes-orchestra-vscode)
+(Cursor, Windsurf, …) + VS Code Marketplace (same extension ID).
 
 **Agent Window integration (optional, secondary):**
 
@@ -131,32 +136,28 @@ The embedded-mode contract lives in `frontend/src/lib/embed.ts` (reads `embed`/`
 - MCP server exposing board state
 - Do **not** put canvas inside Chat — it's the wrong UX
 
-**Publish:** VS Code Marketplace + Open VSX (pick `name`/`publisher` before first publish).
-
 ---
 
-### 3. Cursor extension
+### 3. Cursor / Windsurf — ✅ same extension (Open VSX)
 
-Cursor is a VS Code fork — **same extension architecture**:
+Cursor and Windsurf are VS Code forks — **no separate extension**. Install
+**PiNodes Orchestra** from Open VSX (publisher `emanubiz`) and use the Activity
+Bar panel exactly as in VS Code.
 
-| Aspect | VSCode | Cursor |
-|--------|--------|--------|
+| Aspect | VSCode | Cursor / Windsurf |
+|--------|--------|-------------------|
 | Webview API | ✅ | ✅ |
 | Extension host | ✅ | ✅ |
-| Agent mode / Composer | Copilot | Cursor Agent |
-| Marketplace | VS Marketplace | Cursor marketplace / side-load |
+| Install channel | Marketplace or Open VSX | Open VSX (default in Cursor/Windsurf) |
+| Agent mode / Composer | Copilot | Cursor Agent / Windsurf agent |
 
-**Differences:**
+**Still planned (not required for daily use):**
 
-- Cursor users may want **Cursor agent nodes** (`runtime: "cursor"`) more than pi nodes
-- Cursor SDK may already be available in user's pi setup — document both paths
-- Extension manifest identical; add `cursor`-specific README for agent node setup
+- Dedicated **Cursor agent nodes** (`runtime: "cursor"`) spawning Cursor agent sessions
+- Cursor SDK bridge documentation for pi nodes (`pi --cursor` / MCP)
+- Optional Orchestra tool in Cursor Agent calling the programmatic API
 
-**Placement:** Same as VSCode — sidebar webview, **not** Cursor's agent panel.
-
-**Optional bridge:** Tool in Cursor Agent that calls Orchestra programmatic API (`POST /api/v1/orchestra/flows`).
-
-**Effort:** ~1 week after VSCode extension (mostly repackage + Cursor node runtime).
+**Effort for native Cursor nodes:** ~1–2 weeks (runtime adapter only — extension shell is done).
 
 ---
 
@@ -286,8 +287,8 @@ Full spec: [PROGRAMMATIC_API.md](./PROGRAMMATIC_API.md).
 ```
 Phase 0  ✅ Standalone solid (PTY + WS + docs)
 Phase 1  ✅ Programmatic API P0 (boards + graph + run + status + auth)
-Phase 2  ✅ VS Code extension (webview + subprocess + embedded mode)
-Phase 3  🔜 Cursor extension (repackage + cursor runtime sketch)
+Phase 2  ✅ VS Code–compatible extension (webview + bundled subprocess + Open VSX)
+Phase 3  🔜 Native Cursor agent nodes (`runtime: "cursor"`) — extension shell already works in Cursor/Windsurf
 Phase 4  🔜 Hermes H2 embed contract + optional Desktop PR
 Phase 5  🔜 OpenClaw O2 plugin (HTTP route + gateway method)
 Phase 6  🔜 Multi-runtime adapters (Hermes, OpenClaw, Cursor nodes)

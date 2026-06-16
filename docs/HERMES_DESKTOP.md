@@ -127,10 +127,9 @@ They are **complementary**, not competing. Orchestra is the "mission control" vi
 
 ## Recommended path
 
-1. **Now:** standalone pinodes-orchestra (reference impl)
-2. **Next:** VSCode/Cursor webview extension (same UI, subprocess backend)
-3. **Then:** Hermes Desktop Orchestra tab via iframe to localhost backend (Option B)
-4. **Later:** `HermesRuntime` adapter for native Hermes nodes (Option C)
+1. **Now:** standalone pinodes-orchestra (reference impl) + IDE extension via Open VSX (Cursor, Windsurf, VS Code)
+2. **Next:** Hermes Desktop Orchestra tab via iframe to localhost backend (Option B)
+3. **Later:** `HermesRuntime` adapter for native Hermes nodes (Option C)
 
 ## References
 

@@ -100,6 +100,28 @@ npx @vscode/vsce publish -p <PAT> -i pinodes-orchestra-vscode-darwin-arm64-<VERS
 
 The Marketplace automatically serves the correct VSIX to users based on their platform.
 
+## Open VSX (Cursor, Windsurf, …)
+
+Cursor, Windsurf, and other VS Code forks pull extensions from
+[Open VSX](https://open-vsx.org/) instead of (or in addition to) the VS Code
+Marketplace. Publish the **same platform-specific VSIX files** there:
+
+```bash
+# Login once (requires Open VSX access token)
+npx ovsx login
+
+# Publish each platform (same artifacts as Marketplace)
+npx ovsx publish pinodes-orchestra-vscode-linux-x64-<VERSION>.vsix
+npx ovsx publish pinodes-orchestra-vscode-win32-x64-<VERSION>.vsix
+npx ovsx publish pinodes-orchestra-vscode-darwin-x64-<VERSION>.vsix
+npx ovsx publish pinodes-orchestra-vscode-darwin-arm64-<VERSION>.vsix
+```
+
+Live listing: <https://open-vsx.org/extension/emanubiz/pinodes-orchestra-vscode>
+
+Users install via the Extensions panel — no manual `.vsix` sideload needed unless
+they prefer it. VS Code users can install from either registry.
+
 ## Automation
 
 A GitHub Actions workflow (`.github/workflows/publish-extension.yml`) automates
@@ -122,5 +144,6 @@ Update `vscode-extension/package.json` `version` field before each release. The 
 - [ ] Windows x64 VSIX built + verified
 - [ ] macOS x64 VSIX built + verified
 - [ ] macOS arm64 VSIX built + verified
-- [ ] All four VSIX files published to Marketplace
+- [ ] All four VSIX files published to VS Code Marketplace
+- [ ] All four VSIX files published to Open VSX
 - [ ] GitHub Release created with changelog

@@ -1,13 +1,28 @@
 # PiNodes Orchestra — VS Code extension
 
-Runs the [pinodes-orchestra](../README.md) visual multi-agent console inside VS Code:
-graph canvas, live per-node terminals, and visible `@@HANDOFF` delegation — the
-same UI as the standalone web app, embedded in an editor webview.
+Runs the [pinodes-orchestra](../README.md) visual multi-agent console inside VS Code,
+Cursor, Windsurf, and other VS Code–compatible editors: graph canvas, live per-node
+terminals, and visible `@@HANDOFF` delegation — the same UI as the standalone web
+app, embedded in an editor webview.
 
 > Implements **Phase 2** of [`docs/EXTENSIONS_ROADMAP.md`](../docs/EXTENSIONS_ROADMAP.md):
-> a thin wrapper that spawns the existing Fastify backend as a Node subprocess
+> a thin wrapper that spawns the bundled Fastify backend as a Node subprocess
 > and frames the built frontend. No `node-pty` / `better-sqlite3` runs in the
 > extension host.
+
+## Install (recommended)
+
+Published on **Open VSX** — this is the path for **Cursor**, **Windsurf**, and
+most VS Code forks:
+
+1. Open the Extensions view
+2. Search **PiNodes Orchestra** (publisher: `emanubiz`)
+3. Install → Activity Bar → **PiNodes Orchestra** → **Open PiNodes Orchestra**
+
+Listing: <https://open-vsx.org/extension/emanubiz/pinodes-orchestra-vscode>
+
+On **VS Code**, you can install the same extension from the Marketplace or Open VSX.
+You can also sideload a platform `.vsix` manually if you prefer.
 
 ## How it works
 
@@ -56,18 +71,16 @@ Development Host. Open a folder, click the PiNodes Orchestra activity-bar icon, 
 > manually copying into `~/.vscode/extensions/` is **not** picked up, since VS Code
 > only rescans through its install flow.
 
-## Package & install
+## Package & install (from source)
 
 ```bash
-npm run package                              # produces a .vsix via @vscode/vsce
+npm run package                              # produces a platform .vsix via @vscode/vsce
 code --install-extension pinodes-orchestra-vscode-*.vsix
 ```
 
-When installed (vs. F5), the extension lives outside the repo, so set
-`pinodesOrchestra.backendEntry` to the absolute path of `backend/dist/index.js`.
-To ship a self-contained `.vsix`, bundle the built `backend/` and
-`frontend/dist/` so the default layout `<extension>/../backend/dist/index.js`
-resolves instead.
+When sideloading (vs. Open VSX / Marketplace), pick the VSIX that matches your
+OS/arch (`linux-x64`, `win32-x64`, `darwin-x64`, `darwin-arm64`). The packaged
+extension is self-contained — backend + frontend are bundled under `server/`.
 
 ## Settings
 
@@ -82,6 +95,7 @@ resolves instead.
 
 - Single backend port assumption (`3847`) tied to the standalone frontend's
   same-origin API resolution.
-- Backend isn't bundled into the `.vsix` yet — it references the repo build.
-- Cursor (VS Code fork) uses the same architecture; see the roadmap for the
-  `runtime: "cursor"` node plan.
+- Multi-root workspace handling (currently binds to the first folder).
+- Configurable port (the standalone frontend resolves its API same-origin only on `3847`).
+- Native `runtime: "cursor"` nodes (spawn Cursor agent directly) remain planned;
+  pi nodes work today in Cursor/Windsurf via the same extension.
