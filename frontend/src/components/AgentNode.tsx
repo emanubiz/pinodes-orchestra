@@ -131,7 +131,7 @@ function AgentNodeComponent({ id, data, selected }: NodeProps & { data: Workflow
       )}
 
       {/* live mini pi terminal */}
-      <div className="h-[150px] bg-[var(--app-bg)]">
+      <div className="h-[150px] bg-black">
         <NodeTerminal nodeId={id} />
       </div>
 

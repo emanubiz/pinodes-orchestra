@@ -9,6 +9,7 @@ import { useRuntimeStore } from "../stores/runtimeStore";
 export function NodeTerminal({ nodeId }: { nodeId: string }) {
   const { boardId, send } = useTerminalBridge();
   const hostRef = useRef<HTMLDivElement | null>(null);
+  const scaleRef = useRef<HTMLDivElement | null>(null);
   const termRef = useRef<Terminal | null>(null);
   const [live, setLive] = useState(false);
   const connected = useRuntimeStore((s) => s.connected);
@@ -38,41 +39,50 @@ export function NodeTerminal({ nodeId }: { nodeId: string }) {
     // stream into a grid of a DIFFERENT size garbles it (the infamous staircase).
     // So we render the mirror at the PTY's exact cols/rows and scale it down with
     // CSS to fit the card — faithful, just smaller.
-    const xtermEl = host.querySelector(".xterm") as HTMLElement | null;
+    //
+    // Scale lives on a wrapper, not on `.xterm` itself (xterm owns that element's
+    // inline dimensions). We use `zoom` (Chromium/VS Code webview) so the scaled
+    // box actually fills the card width; `transform: scale()` only paints smaller
+    // and leaves empty space on the right.
     const rescale = () => {
-      if (!xtermEl) return;
+      const scaleEl = scaleRef.current;
+      const xtermEl = host.querySelector(".xterm") as HTMLElement | null;
+      if (!scaleEl || !xtermEl) return;
+      const hostW = host.clientWidth;
+      if (!hostW) return;
+
+      scaleEl.style.zoom = "1";
       const natW = xtermEl.offsetWidth;
-      if (!natW || !host.clientWidth) return;
-      // Scale to card width (not Math.min width/height — that "contains" the PTY
-      // grid and leaves empty space on the right when the card is wider than the
-      // grid's aspect ratio). Clip overflow vertically; pi output is top-aligned.
-      const scale = host.clientWidth / natW;
-      xtermEl.style.transformOrigin = "top left";
-      xtermEl.style.transform = `scale(${scale})`;
+      if (!natW) return;
+
+      scaleEl.style.zoom = String(hostW / natW);
+    };
+
+    const scheduleRescale = () => {
+      requestAnimationFrame(() => requestAnimationFrame(rescale));
     };
 
     const applySize = (cols: number, rows: number) => {
       if (cols > 0 && rows > 0 && (cols !== term.cols || rows !== term.rows)) {
         term.resize(cols, rows);
       }
-      // Let xterm relayout, then measure and scale.
-      requestAnimationFrame(rescale);
+      scheduleRescale();
     };
 
     const unsubSize = onPtySize(key, applySize);
     const unsub = onPtyOutput(key, (data, replay) => {
       if (replay) term.reset();
       if (data.length > 0) setLive(true);
-      term.write(data, () => requestAnimationFrame(rescale));
+      term.write(data, scheduleRescale);
     });
 
     // Attach only to receive scrollback/replay (and the PTY size). Do NOT resize
     // the shared PTY: the interactive terminal owns the dimensions.
     send({ type: "attach_node", nodeId, cols: 80, rows: 24, spawn: false });
 
-    const ro = new ResizeObserver(() => rescale());
+    const ro = new ResizeObserver(scheduleRescale);
     ro.observe(host);
-    requestAnimationFrame(rescale);
+    scheduleRescale();
 
     return () => {
       ro.disconnect();
@@ -85,8 +95,14 @@ export function NodeTerminal({ nodeId }: { nodeId: string }) {
 
   // pointer-events off so dragging/clicking the node still works through it.
   return (
-    <div className="relative h-full w-full overflow-hidden">
-      <div ref={hostRef} className="h-full w-full" style={{ pointerEvents: "none" }} />
+    <div className="node-terminal-mirror relative h-full w-full overflow-hidden bg-black">
+      <div
+        ref={scaleRef}
+        className="inline-block origin-top-left"
+        style={{ transformOrigin: "top left" }}
+      >
+        <div ref={hostRef} style={{ pointerEvents: "none" }} />
+      </div>
       {!live && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-[10px] text-zinc-600">
           starting pi…
