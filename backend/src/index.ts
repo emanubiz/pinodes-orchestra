@@ -24,6 +24,20 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "../..");
 const PORT = Number(process.env.PORT ?? 3847);
 
+// When launched by a host (e.g. the VS Code extension) that sets its own PID
+// here, watch it: if that parent process disappears, exit so we never linger
+// as an orphan holding the port. Standalone runs don't set this and are unaffected.
+const PARENT_PID = Number(process.env.PINODES_ORCHESTRA_PARENT_PID ?? 0);
+if (PARENT_PID > 0) {
+  setInterval(() => {
+    try {
+      process.kill(PARENT_PID, 0); // signal 0 = liveness probe, doesn't kill
+    } catch {
+      process.exit(0); // parent gone
+    }
+  }, 2000).unref();
+}
+
 const app = Fastify({ logger: true });
 
 await app.register(cors, { origin: true });

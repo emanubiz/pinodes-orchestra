@@ -3,8 +3,11 @@ import { BackendManager } from "./backend";
 import { ControlViewProvider } from "./controlView";
 import { OrchestraPanel } from "./panel";
 
+let backendManager: BackendManager | undefined;
+
 export function activate(context: vscode.ExtensionContext): void {
   const backend = new BackendManager(context);
+  backendManager = backend;
   context.subscriptions.push(backend);
 
   const control = new ControlViewProvider(backend);
@@ -36,8 +39,10 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 }
 
-export function deactivate(): Thenable<void> | undefined {
-  // Subscriptions (incl. BackendManager) are disposed by VS Code, which stops
-  // any backend we spawned.
-  return undefined;
+export async function deactivate(): Promise<void> {
+  // On window close / extension shutdown, stop the spawned backend explicitly
+  // (subscription disposal also covers this, but awaiting here makes the kill
+  // deterministic). The backend's own parent-PID watchdog is the final fallback.
+  await backendManager?.stop();
+  backendManager = undefined;
 }

@@ -105,9 +105,26 @@ export class BackendManager {
 
     this.proc = spawn(nodeCmd, [entry], {
       cwd,
-      env: { ...process.env, PORT: String(this.port) },
+      env: {
+        ...process.env,
+        PORT: String(this.port),
+        // Backend watchdog: exit if this extension host dies (see backend/src/index.ts).
+        PINODES_ORCHESTRA_PARENT_PID: String(process.pid),
+      },
     });
     this.external = false;
+
+    // Safety net for a clean extension-host exit: kill the child synchronously.
+    const pid = this.proc.pid;
+    const killOnExit = () => {
+      try {
+        if (pid) process.kill(pid);
+      } catch {
+        /* already gone */
+      }
+    };
+    process.once("exit", killOnExit);
+    this.proc.once("exit", () => process.removeListener("exit", killOnExit));
 
     this.proc.stdout?.on("data", (d: Buffer) => this.output.append(d.toString()));
     this.proc.stderr?.on("data", (d: Buffer) => this.output.append(d.toString()));
