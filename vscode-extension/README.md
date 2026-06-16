@@ -21,6 +21,10 @@ VS Code
 - The backend serves the full React Flow + xterm UI on `/` and exposes `/api/health`.
 - The webview iframes the backend through `vscode.env.asExternalUri`, so live PTY
   WebSockets run inside the iframe against the backend origin.
+- The iframe URL carries `?embed=vscode&cwd=<workspaceFolder>`. In embedded mode the
+  frontend **binds the single board to the workspace folder and hides the repo-tab
+  switcher** (VS Code already owns the cwd), and **does not register the PWA service
+  worker** (so the webview never serves a stale shell).
 - If a backend already answers on the port (e.g. you ran `npm run dev`), the
   extension **adopts** it instead of spawning a second one.
 
@@ -46,15 +50,24 @@ Then press **F5** (“Run Pi Orchestra Extension”) to launch an Extension
 Development Host. Open a folder, click the Pi Orchestra activity-bar icon, then
 **Open Pi Orchestra**.
 
-## Package
+> On some setups (notably the **snap-packaged** VS Code on Linux) the F5
+> `--extensionDevelopmentPath` flow may fail to scan the extension folder. If the
+> Pi Orchestra icon never appears, install a packaged `.vsix` instead (below) —
+> manually copying into `~/.vscode/extensions/` is **not** picked up, since VS Code
+> only rescans through its install flow.
+
+## Package & install
 
 ```bash
-npm run package      # produces a .vsix via @vscode/vsce
+npm run package                              # produces a .vsix via @vscode/vsce
+code --install-extension pi-orchestra-vscode-*.vsix
 ```
 
+When installed (vs. F5), the extension lives outside the repo, so set
+`piOrchestra.backendEntry` to the absolute path of `backend/dist/index.js`.
 To ship a self-contained `.vsix`, bundle the built `backend/` and
 `frontend/dist/` so the default layout `<extension>/../backend/dist/index.js`
-resolves — or set `piOrchestra.backendEntry` to wherever you place it.
+resolves instead.
 
 ## Settings
 

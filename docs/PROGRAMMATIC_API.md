@@ -17,7 +17,7 @@ REST and CLI surface for **host integrations** — Hermes Desktop tab, OpenClaw 
 http://localhost:3847   # default standalone
 ```
 
-Configurable via `PI_ORCHESTRA_PORT` / `PI_ORCHESTRA_URL`.
+Listen port is set by `PORT` (default 3847). `PI_ORCHESTRA_URL` overrides the callback URL pi nodes use, not the port clients connect to.
 
 ---
 

@@ -116,14 +116,16 @@ pi-orchestra/
 │       ├── routes/orchestra.ts  # /api/v1/orchestra — programmatic board/flow REST API
 │       ├── orchestra/BoardManager.ts  # board state + graph management, bridges db ↔ PtyHub
 │       └── types.ts
-└── frontend/
-    └── src/
-        ├── components/      # FlowCanvas, AgentNode, TerminalPanel, TerminalOverlay,
-        │                    # KanbanBoard, PromptLibrary, WorkflowPicker, NodeInspector,
-        │                    # SystemPromptModal, BoardTabs
-        ├── stores/          # boardStore, runtimeStore, kanbanStore (zustand)
-        ├── hooks/           # useOrchestraWs
-        └── lib/             # api, ptyBus, termTheme, termFit
+├── frontend/
+│   └── src/
+│       ├── components/      # FlowCanvas, AgentNode, TerminalPanel, TerminalOverlay,
+│       │                    # KanbanBoard, PromptLibrary, WorkflowPicker, NodeInspector,
+│       │                    # SystemPromptModal, BoardTabs
+│       ├── stores/          # boardStore, runtimeStore, kanbanStore (zustand)
+│       ├── hooks/           # useOrchestraWs
+│       └── lib/             # api, ptyBus, termTheme, termFit, embed (host-embed flags)
+└── vscode-extension/        # VS Code host: spawns the backend, frames the UI in a webview
+    └── src/                 # extension, backend (subprocess mgr), panel (webview), controlView
 ```
 
 ## WebSocket protocol
@@ -177,8 +179,9 @@ See [docs/PROGRAMMATIC_API.md](./docs/PROGRAMMATIC_API.md) for the full programm
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `PORT` / `PI_ORCHESTRA_PORT` | `3847` | Backend listen port |
-| `PI_ORCHESTRA_URL` | `http://localhost:<port>` | URL injected into pi nodes |
+| `PORT` | `3847` | Backend listen port |
+| `PI_ORCHESTRA_URL` | `http://localhost:<port>` | Callback URL injected into pi nodes |
+| `PI_ORCHESTRA_PORT` | `PORT` | Overrides only the port in that callback URL — **not** the listen port |
 | `PI_ORCHESTRA_ROOT` | repo root | Bundled prompts location |
 | `PI_ORCHESTRA_DATA_DIR` | `<root>/data` | SQLite database directory |
 | `PI_ORCHESTRA_TOKEN` | (empty — no auth) | Shared secret for programmatic API auth |
@@ -192,6 +195,8 @@ Each board tab = one `cwd` + workflow snapshot + isolated `boardId:nodeId` PTY s
 - Switching tab loads snapshot and syncs graph via `load_graph`
 - Runtime state keyed by `boardId:nodeId`
 - **Stop board** aborts only the active board's nodes
+
+When **embedded in a host** (VS Code) the iframe URL carries `?embed=vscode&cwd=…`: the frontend collapses to a single board bound to the host workspace folder (`boardStore.bindWorkspace`) and hides the repo-tab sidebar — the host already owns the "current project". See `frontend/src/lib/embed.ts` and [docs/EXTENSIONS_ROADMAP.md](./docs/EXTENSIONS_ROADMAP.md).
 
 ## Views
 

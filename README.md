@@ -32,6 +32,24 @@ Backend serves `frontend/dist` on `http://localhost:3847`.
 
 In Chrome/Edge, use the browser **Install** action. The service worker caches static assets; agent execution still needs the backend running.
 
+## Run in VS Code
+
+The repo ships a VS Code extension (`vscode-extension/`) that embeds the same
+canvas in an editor webview. It spawns the backend as a Node subprocess (no
+`node-pty`/SQLite in the extension host) and binds the board to the open
+workspace folder — no repo-tab switcher, since VS Code already owns the cwd.
+
+```bash
+# build the app the extension serves, then the extension itself
+npm run build
+cd vscode-extension && npm install && npm run compile
+npx @vscode/vsce package        # produces a .vsix
+code --install-extension pi-orchestra-vscode-*.vsix
+```
+
+Reload VS Code → **Pi Orchestra** in the Activity Bar → **Open Pi Orchestra**.
+See [`vscode-extension/README.md`](./vscode-extension/README.md) for details.
+
 ## Requirements
 
 - Node.js 22+
@@ -52,8 +70,9 @@ In Chrome/Edge, use the browser **Install** action. The service worker caches st
 
 | Variable | Purpose |
 |----------|---------|
-| `PI_ORCHESTRA_PORT` | Backend port (default 3847) |
-| `PI_ORCHESTRA_URL` | URL pi nodes use to call back (default `http://localhost:<port>`) |
+| `PORT` | Port the backend listens on (default 3847) |
+| `PI_ORCHESTRA_URL` | Base URL pi nodes use to call back (default `http://localhost:<port>`) |
+| `PI_ORCHESTRA_PORT` | Override only the port in that callback URL (does **not** change the listen port — set `PORT` for that) |
 | `PI_ORCHESTRA_DATA_DIR` | SQLite location |
 | `PI_ORCHESTRA_TOKEN` | Shared secret for programmatic API auth (optional) |
 | `VITE_API_BASE` | Custom backend URL at frontend build time |
@@ -63,7 +82,8 @@ In Chrome/Edge, use the browser **Install** action. The service worker caches st
 | Doc | Contents |
 |-----|----------|
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Current system design, WS protocol, handoff |
-| [docs/EXTENSIONS_ROADMAP.md](./docs/EXTENSIONS_ROADMAP.md) | VSCode, Cursor, Hermes, OpenClaw — planned integrations |
+| [docs/EXTENSIONS_ROADMAP.md](./docs/EXTENSIONS_ROADMAP.md) | Host integrations — VS Code (done), Cursor, Hermes, OpenClaw |
+| [vscode-extension/README.md](./vscode-extension/README.md) | VS Code extension — how it works, build, settings |
 | [docs/HERMES_DESKTOP.md](./docs/HERMES_DESKTOP.md) | Hermes Desktop analysis |
 | [docs/PROGRAMMATIC_API.md](./docs/PROGRAMMATIC_API.md) | REST/CLI API for programmatic orchestration (boards, flows, auth) |
 
@@ -80,12 +100,13 @@ curl -s http://localhost:3847/api/v1/orchestra/flows \
 
 Details: [docs/PROGRAMMATIC_API.md](./docs/PROGRAMMATIC_API.md).
 
-## Extension roadmap (not implemented yet)
+## Host integrations
 
-Standalone is the reference implementation. Future hosts:
+Standalone is the reference implementation. Hosts:
 
-- **VSCode / Cursor** — webview extension with same React UI
-- **Hermes Desktop** — Orchestra tab via remote dashboard or embedded webview
-- **OpenClaw** — Orchestra tab via Gateway HTTP route or external WS client
+- **VS Code** — ✅ webview extension (`vscode-extension/`, see above)
+- **Cursor** — same architecture as VS Code (planned: native `runtime: "cursor"` nodes)
+- **Hermes Desktop** — Orchestra tab via remote dashboard or embedded webview (planned)
+- **OpenClaw** — Orchestra tab via Gateway HTTP route or external WS client (planned)
 
 Details: [docs/EXTENSIONS_ROADMAP.md](./docs/EXTENSIONS_ROADMAP.md).

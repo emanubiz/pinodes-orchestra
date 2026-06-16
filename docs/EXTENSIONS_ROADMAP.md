@@ -2,7 +2,7 @@
 
 How **pi-orchestra** integrates as a tab/panel in VSCode, Cursor, Hermes Desktop, and OpenClaw — without replacing its core identity as a **visual orchestration console**.
 
-> **Scope of this document:** design and sequencing only. Implementation is future work. Standalone (browser/PWA) is the reference implementation.
+> **Scope of this document:** design and sequencing. The **VS Code extension is implemented** (MVP, `vscode-extension/`); the remaining hosts are future work. Standalone (browser/PWA) is the reference implementation.
 
 ## Product invariant
 
@@ -90,9 +90,11 @@ Handoff: same `@@HANDOFF` block or structured `call_agent` if Cursor exposes it.
 
 ---
 
-### 2. VSCode extension
+### 2. VS Code extension — ✅ implemented (MVP)
 
-**Placement:** Activity Bar → **Pi Orchestra** → webview panel (not Agent Chat window).
+Lives in [`vscode-extension/`](../vscode-extension/README.md).
+
+**Placement:** Activity Bar → **Pi Orchestra** → control view (status + launcher) + a full editor-area webview panel (not the Agent Chat window).
 
 ```
 VSCode Workbench
@@ -105,13 +107,23 @@ VSCode Workbench
     └─ pi-orchestra backend subprocess (or in-process PtyHub)
 ```
 
-| Component | Strategy |
-|-----------|----------|
-| UI | Bundle `frontend/dist` into extension; `createWebviewPanel` |
-| Transport | Phase 1: localhost WS (spawn backend). Phase 2: `postMessage` |
-| cwd | `vscode.workspace.workspaceFolders[0]` |
-| Terminals | xterm in webview (same as standalone) |
-| Native addons | Avoid in-process `node-pty` — spawn Node subprocess |
+| Component | Strategy | Status |
+|-----------|----------|--------|
+| UI | `createWebviewPanel` framing the backend-served UI in an iframe via `vscode.env.asExternalUri` | ✅ |
+| Transport | localhost HTTP/WS — frontend talks to the backend origin directly inside the iframe | ✅ |
+| Backend | spawned as a Node subprocess (`backend/dist/index.js`); adopts an already-running one | ✅ |
+| cwd | `workspaceFolders[0]` passed as `?embed=vscode&cwd=…`; frontend binds the single board and hides the repo-tab switcher | ✅ |
+| Service worker | not registered in embedded mode (avoids stale-shell caching in the webview) | ✅ |
+| Native addons | no in-process `node-pty`/`better-sqlite3` — all in the subprocess | ✅ |
+| Terminals | xterm in webview (same as standalone) | ✅ |
+
+The embedded-mode contract lives in `frontend/src/lib/embed.ts` (reads `embed`/`cwd` from the iframe URL).
+
+**Still open:**
+
+- Bundle `backend/` + `frontend/dist` into the `.vsix` so it installs without a repo checkout (today the extension references the built backend via `piOrchestra.backendEntry`).
+- Multi-root workspace handling (currently binds to the first folder).
+- Configurable port (the standalone frontend resolves its API same-origin only on `3847`).
 
 **Agent Window integration (optional, secondary):**
 
@@ -119,9 +131,7 @@ VSCode Workbench
 - MCP server exposing board state
 - Do **not** put canvas inside Chat — it's the wrong UX
 
-**Effort:** ~2–3 weeks MVP (thin wrapper + subprocess backend).
-
-**Publish:** VS Code Marketplace + Open VSX.
+**Publish:** VS Code Marketplace + Open VSX (pick `name`/`publisher` before first publish).
 
 ---
 
@@ -276,7 +286,7 @@ Full spec: [PROGRAMMATIC_API.md](./PROGRAMMATIC_API.md).
 ```
 Phase 0  ✅ Standalone solid (PTY + WS + docs)
 Phase 1  ✅ Programmatic API P0 (boards + graph + run + status + auth)
-Phase 2  🔜 VSCode extension (webview + subprocess)
+Phase 2  ✅ VS Code extension (webview + subprocess + embedded mode)
 Phase 3  🔜 Cursor extension (repackage + cursor runtime sketch)
 Phase 4  🔜 Hermes H2 embed contract + optional Desktop PR
 Phase 5  🔜 OpenClaw O2 plugin (HTTP route + gateway method)
