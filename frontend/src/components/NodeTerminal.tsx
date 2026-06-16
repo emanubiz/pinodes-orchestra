@@ -25,6 +25,7 @@ export function NodeTerminal({ nodeId }: { nodeId: string }) {
       lineHeight: 1.15,
       fontFamily: TERM_FONT,
       theme: TERM_THEME,
+      allowTransparency: true,
       scrollback: 800,
       convertEol: false,
       minimumContrastRatio: 1,

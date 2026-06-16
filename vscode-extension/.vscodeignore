@@ -1,8 +1,14 @@
 .vscode/**
 src/**
+scripts/**
 tsconfig.json
+package-lock.json
 **/*.map
 **/*.ts
 .gitignore
+.vscodeignore
 node_modules/**
 !dist/**
+# Self-contained backend bundle (built by scripts/bundle.mjs). Re-include it
+# wholesale — it intentionally ships .ts (pi --extension) and prod node_modules.
+!server/**

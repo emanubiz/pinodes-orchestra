@@ -84,7 +84,7 @@ function renderHtml(webview: vscode.Webview, src: string): string {
   <meta http-equiv="Content-Security-Policy" content="${csp}" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-    html, body { height: 100%; margin: 0; padding: 0; background: #09090b; }
+    html, body { height: 100%; margin: 0; padding: 0; background: var(--vscode-editor-background, #09090b); }
     iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
     #fallback {
       position: absolute; inset: 0; display: none; place-content: center;
@@ -111,6 +111,30 @@ function renderHtml(webview: vscode.Webview, src: string): string {
     const fallback = document.getElementById('fallback');
     function reload() { vscode.postMessage({ type: 'reload' }); }
     frame.addEventListener('error', () => { fallback.style.display = 'grid'; });
+
+    // The framed app is cross-origin and can't read our --vscode-* variables,
+    // so forward the editor theme colors into it (and re-forward on theme switch).
+    function readTheme() {
+      const cs = getComputedStyle(document.documentElement);
+      const bg = cs.getPropertyValue('--vscode-editor-background').trim();
+      const fg = (cs.getPropertyValue('--vscode-editor-foreground').trim()
+        || cs.getPropertyValue('--vscode-foreground').trim());
+      const cls = document.body.className;
+      const kind = (cls.indexOf('vscode-light') !== -1
+        || cls.indexOf('vscode-high-contrast-light') !== -1) ? 'light' : 'dark';
+      return { type: 'host-theme', bg: bg, fg: fg, kind: kind };
+    }
+    function postTheme() {
+      try { frame.contentWindow && frame.contentWindow.postMessage(readTheme(), '*'); } catch (e) {}
+    }
+    frame.addEventListener('load', postTheme);
+    window.addEventListener('message', function (e) {
+      if (e.data && e.data.type === 'orchestra-ready') postTheme();
+    });
+    // VS Code swaps the theme by mutating the body class + --vscode-* vars.
+    new MutationObserver(postTheme).observe(document.body, {
+      attributes: true, attributeFilter: ['class'],
+    });
   </script>
 </body>
 </html>`;

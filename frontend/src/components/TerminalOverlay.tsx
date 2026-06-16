@@ -29,6 +29,7 @@ export function TerminalOverlay({ boardId, nodeId, label, send, onClose }: Termi
       lineHeight: 1.2,
       fontFamily: TERM_FONT,
       theme: TERM_THEME,
+      allowTransparency: true,
       cursorBlink: true,
       scrollback: 8000,
       allowProposedApi: true,

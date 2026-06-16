@@ -5,6 +5,18 @@ import * as vscode from "vscode";
 
 export type BackendStatus = "stopped" | "starting" | "running" | "external" | "error";
 
+/** Thrown when the required `pi` CLI is not installed. The modal is shown to the
+ * user at the point of detection, so callers should swallow this quietly. */
+export class PiNotFoundError extends Error {
+  constructor() {
+    super("pi CLI not found on PATH");
+    this.name = "PiNotFoundError";
+  }
+}
+
+const PI_INSTALL_CMD = "npm i -g @earendil-works/pi-coding-agent";
+const PI_INSTALL_URL = "https://www.npmjs.com/package/@earendil-works/pi-coding-agent";
+
 /**
  * Owns the pinodes-orchestra backend lifecycle for the extension.
  *
@@ -66,7 +78,55 @@ export class BackendManager {
       return;
     }
 
+    // The backend spawns one `pi` process per agent node, so it's a hard
+    // prerequisite. VS Code can't gate installation on it, so we gate launch:
+    // if pi isn't on PATH we tell the user how to install it and abort.
+    await this.ensurePi();
+
     await this.spawnBackend();
+  }
+
+  /** Locate the `pi` CLI on PATH (cross-platform). */
+  private findPi(): string | undefined {
+    const names = process.platform === "win32" ? ["pi.cmd", "pi.exe", "pi.bat", "pi"] : ["pi"];
+    const dirs = (process.env.PATH ?? "").split(path.delimiter).filter(Boolean);
+    for (const dir of dirs) {
+      for (const name of names) {
+        const candidate = path.join(dir, name);
+        try {
+          if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return candidate;
+        } catch {
+          /* unreadable PATH entry — skip */
+        }
+      }
+    }
+    return undefined;
+  }
+
+  /** Throw (after showing an actionable modal) if the `pi` CLI is missing. */
+  private async ensurePi(): Promise<void> {
+    const found = this.findPi();
+    if (found) {
+      this.log(`Found pi CLI: ${found}`);
+      return;
+    }
+    this.setStatus("error");
+    this.log("pi CLI not found on PATH — cannot start backend.");
+    const INSTALL = "Install instructions";
+    const pick = await vscode.window.showErrorMessage(
+      "PiNodes Orchestra needs the pi coding agent CLI, but it isn't installed on your PATH.",
+      {
+        modal: true,
+        detail:
+          `Install it, then reopen PiNodes Orchestra:\n\n  ${PI_INSTALL_CMD}\n\n` +
+          "After installing, restart VS Code so the updated PATH is picked up.",
+      },
+      INSTALL,
+    );
+    if (pick === INSTALL) {
+      void vscode.env.openExternal(vscode.Uri.parse(PI_INSTALL_URL));
+    }
+    throw new PiNotFoundError();
   }
 
   private resolveEntry(): string {
@@ -76,8 +136,18 @@ export class BackendManager {
       .trim();
     if (configured) return configured;
 
-    // Default layout: <repo>/vscode-extension/  →  <repo>/backend/dist/index.js
+    // Self-contained packaged extension: the backend (+ frontend, prompts, prod
+    // node_modules) is bundled under `<extension>/server/` by scripts/bundle.mjs.
+    const bundled = path.join(this.bundledRoot, "backend", "dist", "index.js");
+    if (fs.existsSync(bundled)) return bundled;
+
+    // Dev layout: <repo>/vscode-extension/  →  <repo>/backend/dist/index.js
     return path.join(this.context.extensionPath, "..", "backend", "dist", "index.js");
+  }
+
+  /** Root of the bundled server tree inside a packaged extension. */
+  private get bundledRoot(): string {
+    return path.join(this.context.extensionPath, "server");
   }
 
   private workspaceCwd(): string | undefined {
@@ -98,10 +168,16 @@ export class BackendManager {
       .get<string>("nodeCommand", "node");
     const cwd = this.workspaceCwd() ?? path.dirname(path.dirname(entry));
 
+    // When running the packaged backend, keep its SQLite DB in the extension's
+    // per-user global storage (the install dir is wiped on every update).
+    const bundled = entry.startsWith(this.bundledRoot);
+    const dataDir = this.context.globalStorageUri.fsPath;
+
     this.setStatus("starting");
     this.log(`Starting backend: ${nodeCmd} ${entry}`);
     this.log(`  cwd:  ${cwd}`);
     this.log(`  port: ${this.port}`);
+    if (bundled) this.log(`  data: ${dataDir}`);
 
     this.proc = spawn(nodeCmd, [entry], {
       cwd,
@@ -110,6 +186,8 @@ export class BackendManager {
         PORT: String(this.port),
         // Backend watchdog: exit if this extension host dies (see backend/src/index.ts).
         PINODES_ORCHESTRA_PARENT_PID: String(process.pid),
+        // Packaged: persist the DB outside the (volatile) extension install dir.
+        ...(bundled ? { PINODES_ORCHESTRA_DATA_DIR: dataDir } : {}),
       },
     });
     this.external = false;

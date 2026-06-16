@@ -2,6 +2,11 @@
 
 :root {
   color-scheme: dark;
+  /* Base surface + text. Standalone keeps the near-black palette; when embedded
+     in a host (VS Code) these are overridden live with the editor's theme
+     colors so the app blends in — see lib/embedTheme.ts. */
+  --app-bg: #09090b;
+  --app-fg: #e4e4e7;
 }
 
 html, body, #root {
@@ -12,8 +17,8 @@ html, body, #root {
 body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  color: #e4e4e7;
-  background-color: #09090b;
+  color: var(--app-fg);
+  background-color: var(--app-bg);
 }
 
 /* ── Refined scrollbars ─────────────────────────────── */

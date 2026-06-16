@@ -1,7 +1,9 @@
 import { createContext, useContext } from "react";
 
 export const TERM_THEME = {
-  background: "#09090b",
+  // Transparent so the terminal inherits its themed container background
+  // (`--app-bg`), which follows the VS Code theme when embedded.
+  background: "rgba(0,0,0,0)",
   foreground: "#e4e4e7",
   cursor: "#a78bfa",
   cursorAccent: "#09090b",

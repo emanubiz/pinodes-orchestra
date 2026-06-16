@@ -1,7 +1,11 @@
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { IS_EMBEDDED } from "./lib/embed";
+import { initEmbedTheme } from "./lib/embedTheme";
 import "./index.css";
+
+// Inherit the host (VS Code) theme colors when embedded; no-op standalone.
+initEmbedTheme();
 
 if (IS_EMBEDDED) {
   // In a host webview (VS Code) the PWA service worker only gets in the way:

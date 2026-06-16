@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { BackendManager } from "./backend";
+import { BackendManager, PiNotFoundError } from "./backend";
 import { ControlViewProvider } from "./controlView";
 import { OrchestraPanel } from "./panel";
 
@@ -20,6 +20,8 @@ export function activate(context: vscode.ExtensionContext): void {
       try {
         await OrchestraPanel.show(context, backend);
       } catch (err) {
+        // pi-missing already showed its own actionable modal — don't double up.
+        if (err instanceof PiNotFoundError) return;
         const msg = err instanceof Error ? err.message : String(err);
         const pick = await vscode.window.showErrorMessage(
           `PiNodes Orchestra: ${msg}`,
@@ -29,10 +31,15 @@ export function activate(context: vscode.ExtensionContext): void {
       }
     }),
     vscode.commands.registerCommand("pinodesOrchestra.restartBackend", async () => {
-      await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: "Restarting PiNodes Orchestra backend…" },
-        () => backend.restart(),
-      );
+      try {
+        await vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title: "Restarting PiNodes Orchestra backend…" },
+          () => backend.restart(),
+        );
+      } catch (err) {
+        if (err instanceof PiNotFoundError) return;
+        throw err;
+      }
     }),
     vscode.commands.registerCommand("pinodesOrchestra.stopBackend", () => backend.stop()),
     vscode.commands.registerCommand("pinodesOrchestra.showLogs", () => backend.showLogs()),

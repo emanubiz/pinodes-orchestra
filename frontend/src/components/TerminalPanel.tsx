@@ -32,6 +32,7 @@ export function TerminalPanel({ boardId, send }: TerminalPanelProps) {
       lineHeight: 1.15,
       fontFamily: TERM_FONT,
       theme: TERM_THEME,
+      allowTransparency: true,
       cursorBlink: true,
       scrollback: 5000,
       allowProposedApi: true,
@@ -76,7 +77,7 @@ export function TerminalPanel({ boardId, send }: TerminalPanelProps) {
 
   if (!selectedNodeId) {
     return (
-      <div className="flex h-full items-center justify-center bg-[#09090b] text-sm text-zinc-600 p-4 text-center">
+      <div className="flex h-full items-center justify-center bg-[var(--app-bg)] text-sm text-zinc-600 p-4 text-center">
         Select a node to open its pi terminal
       </div>
     );
@@ -85,7 +86,7 @@ export function TerminalPanel({ boardId, send }: TerminalPanelProps) {
   const running = status === "running";
 
   return (
-    <div className="flex h-full flex-col bg-[#09090b]">
+    <div className="flex h-full flex-col bg-[var(--app-bg)]">
       <div className="flex items-center justify-between border-b border-white/5 px-3 py-1.5 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <span
