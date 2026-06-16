@@ -104,7 +104,7 @@ async function buildApp() {
 describe("orchestra routes", () => {
   beforeEach(() => {
     mockBoards.clear();
-    delete process.env.PI_ORCHESTRA_TOKEN;
+    delete process.env.PINODES_ORCHESTRA_TOKEN;
   });
 
   it("creates and lists boards", async () => {
@@ -386,7 +386,7 @@ describe("orchestra routes", () => {
   });
 
   it("rejects requests without token when auth is enabled", async () => {
-    process.env.PI_ORCHESTRA_TOKEN = "secret";
+    process.env.PINODES_ORCHESTRA_TOKEN = "secret";
     const { app } = await buildApp();
 
     const noToken = await app.inject({
@@ -398,14 +398,14 @@ describe("orchestra routes", () => {
     const badToken = await app.inject({
       method: "GET",
       url: "/api/v1/orchestra/boards",
-      headers: { "X-Pi-Orchestra-Token": "wrong" },
+      headers: { "X-PiNodes-Orchestra-Token": "wrong" },
     });
     expect(badToken.statusCode).toBe(401);
 
     const ok = await app.inject({
       method: "GET",
       url: "/api/v1/orchestra/boards",
-      headers: { "X-Pi-Orchestra-Token": "secret" },
+      headers: { "X-PiNodes-Orchestra-Token": "secret" },
     });
     expect(ok.statusCode).toBe(200);
 

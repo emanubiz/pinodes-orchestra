@@ -5,15 +5,15 @@ import { fileURLToPath } from "node:url";
 import type { BoardRow, BoardState, SystemPromptRow, WorkflowGraph } from "../types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// PI_ORCHESTRA_ROOT: bundled assets (prompts). Defaults to repo root.
-const ROOT = process.env.PI_ORCHESTRA_ROOT
-  ? path.resolve(process.env.PI_ORCHESTRA_ROOT)
+// PINODES_ORCHESTRA_ROOT: bundled assets (prompts). Defaults to repo root.
+const ROOT = process.env.PINODES_ORCHESTRA_ROOT
+  ? path.resolve(process.env.PINODES_ORCHESTRA_ROOT)
   : path.resolve(__dirname, "../../..");
-// PI_ORCHESTRA_DATA_DIR: writable SQLite location. Defaults to <root>/data.
-const DATA_DIR = process.env.PI_ORCHESTRA_DATA_DIR
-  ? path.resolve(process.env.PI_ORCHESTRA_DATA_DIR)
+// PINODES_ORCHESTRA_DATA_DIR: writable SQLite location. Defaults to <root>/data.
+const DATA_DIR = process.env.PINODES_ORCHESTRA_DATA_DIR
+  ? path.resolve(process.env.PINODES_ORCHESTRA_DATA_DIR)
   : path.join(ROOT, "data");
-const DB_PATH = path.join(DATA_DIR, "pi-orchestra.db");
+const DB_PATH = path.join(DATA_DIR, "pinodes-orchestra.db");
 const PROMPTS_DIR = path.join(ROOT, "prompts");
 
 let db: Database.Database;

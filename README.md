@@ -1,4 +1,4 @@
-# pi-orchestra
+# pinodes-orchestra
 
 Visual canvas of **pi** agent consoles. Semi-automatic multi-agent pipeline with human intervention on any node.
 
@@ -7,7 +7,7 @@ This is a **web app / PWA**: React frontend + Node.js backend (Fastify + WebSock
 ## Quick start
 
 ```bash
-cd pi-orchestra
+cd pinodes-orchestra
 npm install
 npm run dev
 ```
@@ -44,10 +44,10 @@ workspace folder — no repo-tab switcher, since VS Code already owns the cwd.
 npm run build
 cd vscode-extension && npm install && npm run compile
 npx @vscode/vsce package        # produces a .vsix
-code --install-extension pi-orchestra-vscode-*.vsix
+code --install-extension pinodes-orchestra-vscode-*.vsix
 ```
 
-Reload VS Code → **Pi Orchestra** in the Activity Bar → **Open Pi Orchestra**.
+Reload VS Code → **PiNodes Orchestra** in the Activity Bar → **Open PiNodes Orchestra**.
 See [`vscode-extension/README.md`](./vscode-extension/README.md) for details.
 
 ## Requirements
@@ -71,10 +71,10 @@ See [`vscode-extension/README.md`](./vscode-extension/README.md) for details.
 | Variable | Purpose |
 |----------|---------|
 | `PORT` | Port the backend listens on (default 3847) |
-| `PI_ORCHESTRA_URL` | Base URL pi nodes use to call back (default `http://localhost:<port>`) |
-| `PI_ORCHESTRA_PORT` | Override only the port in that callback URL (does **not** change the listen port — set `PORT` for that) |
-| `PI_ORCHESTRA_DATA_DIR` | SQLite location |
-| `PI_ORCHESTRA_TOKEN` | Shared secret for programmatic API auth (optional) |
+| `PINODES_ORCHESTRA_URL` | Base URL pi nodes use to call back (default `http://localhost:<port>`) |
+| `PINODES_ORCHESTRA_PORT` | Override only the port in that callback URL (does **not** change the listen port — set `PORT` for that) |
+| `PINODES_ORCHESTRA_DATA_DIR` | SQLite location |
+| `PINODES_ORCHESTRA_TOKEN` | Shared secret for programmatic API auth (optional) |
 | `VITE_API_BASE` | Custom backend URL at frontend build time |
 
 ## Documentation

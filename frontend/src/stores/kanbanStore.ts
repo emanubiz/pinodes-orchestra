@@ -116,7 +116,7 @@ export const useKanbanStore = create<KanbanState>()(
         }),
     }),
     {
-      name: "pi-orchestra-kanban",
+      name: "pinodes-orchestra-kanban",
       version: 2,
       migrate: (persisted: unknown) => {
         const state = persisted as { cards?: KanbanCard[] } | undefined;

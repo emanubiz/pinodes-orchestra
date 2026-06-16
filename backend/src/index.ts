@@ -31,7 +31,7 @@ await app.register(websocket);
 
 app.get("/api/health", async () => ({
   ok: true,
-  name: "pi-orchestra",
+  name: "pinodes-orchestra",
   version: "0.1.0",
   port: PORT,
 }));
@@ -39,7 +39,7 @@ app.get("/api/health", async () => ({
 /** Server info for clients that need a sensible default cwd (browser has no process.cwd). */
 app.get("/api/info", async () => ({
   ok: true,
-  name: "pi-orchestra",
+  name: "pinodes-orchestra",
   version: "0.1.0",
   port: PORT,
   defaultCwd: process.cwd(),
@@ -135,4 +135,4 @@ try {
 }
 
 await app.listen({ port: PORT, host: "0.0.0.0" });
-console.log(`pi-orchestra backend http://localhost:${PORT}`);
+console.log(`pinodes-orchestra backend http://localhost:${PORT}`);

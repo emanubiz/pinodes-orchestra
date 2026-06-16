@@ -247,8 +247,8 @@ export function App() {
         {/* brand */}
         <div className="toolbar-segment px-3">
           <h1 className="text-[13px] font-semibold tracking-tight select-none whitespace-nowrap">
-            <span className="text-zinc-200">pi</span>
-            <span className="text-zinc-500">-orchestra</span>
+            <span className="text-zinc-200">PiNodes</span>
+            <span className="text-zinc-500"> Orchestra</span>
           </h1>
         </div>
 

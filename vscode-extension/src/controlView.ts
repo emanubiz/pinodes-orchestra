@@ -1,9 +1,9 @@
 import * as vscode from "vscode";
 import { BackendManager, BackendStatus } from "./backend";
 
-/** Lightweight launcher/status view rendered in the Pi Orchestra activity-bar container. */
+/** Lightweight launcher/status view rendered in the PiNodes Orchestra activity-bar container. */
 export class ControlViewProvider implements vscode.WebviewViewProvider {
-  static readonly viewType = "piOrchestra.control";
+  static readonly viewType = "pinodesOrchestra.control";
   private view: vscode.WebviewView | undefined;
 
   constructor(private readonly backend: BackendManager) {
@@ -16,16 +16,16 @@ export class ControlViewProvider implements vscode.WebviewViewProvider {
     view.webview.onDidReceiveMessage((msg: { type?: string }) => {
       switch (msg?.type) {
         case "open":
-          void vscode.commands.executeCommand("piOrchestra.open");
+          void vscode.commands.executeCommand("pinodesOrchestra.open");
           break;
         case "restart":
-          void vscode.commands.executeCommand("piOrchestra.restartBackend");
+          void vscode.commands.executeCommand("pinodesOrchestra.restartBackend");
           break;
         case "stop":
-          void vscode.commands.executeCommand("piOrchestra.stopBackend");
+          void vscode.commands.executeCommand("pinodesOrchestra.stopBackend");
           break;
         case "logs":
-          void vscode.commands.executeCommand("piOrchestra.showLogs");
+          void vscode.commands.executeCommand("pinodesOrchestra.showLogs");
           break;
       }
     });
@@ -74,7 +74,7 @@ function html(status: BackendStatus, port: number): string {
 <body>
   <div class="status"><span class="dot"></span><span>${label[status]}</span></div>
   <p class="muted">Backend → localhost:${port}</p>
-  <button class="primary" onclick="send('open')">Open Pi Orchestra</button>
+  <button class="primary" onclick="send('open')">Open PiNodes Orchestra</button>
   <button onclick="send('restart')">Restart backend</button>
   <button onclick="send('stop')">Stop backend</button>
   <button onclick="send('logs')">Show logs</button>

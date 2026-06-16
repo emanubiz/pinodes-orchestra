@@ -7,12 +7,12 @@ let testDir: string;
 
 describe("board persistence", () => {
   beforeEach(() => {
-    testDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-orchestra-db-"));
-    process.env.PI_ORCHESTRA_DATA_DIR = testDir;
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), "pinodes-orchestra-db-"));
+    process.env.PINODES_ORCHESTRA_DATA_DIR = testDir;
   });
 
   afterEach(() => {
-    delete process.env.PI_ORCHESTRA_DATA_DIR;
+    delete process.env.PINODES_ORCHESTRA_DATA_DIR;
     fs.rmSync(testDir, { recursive: true, force: true });
   });
 

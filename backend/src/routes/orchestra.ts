@@ -6,9 +6,9 @@ import type { WorkflowGraph } from "../types.js";
 function checkAuth(req: { headers: Record<string, string | string[] | undefined> }, reply: {
   code: (code: number) => { send: (payload: unknown) => void };
 }): boolean {
-  const token = process.env.PI_ORCHESTRA_TOKEN;
+  const token = process.env.PINODES_ORCHESTRA_TOKEN;
   if (!token) return true;
-  const header = req.headers["x-pi-orchestra-token"];
+  const header = req.headers["x-pinodes-orchestra-token"];
   const auth = req.headers.authorization;
   const bearer = typeof auth === "string" && auth.startsWith("Bearer ") ? auth.slice(7) : undefined;
   const provided = typeof header === "string" ? header : bearer;

@@ -13,26 +13,26 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("piOrchestra.open", async () => {
+    vscode.commands.registerCommand("pinodesOrchestra.open", async () => {
       try {
         await OrchestraPanel.show(context, backend);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         const pick = await vscode.window.showErrorMessage(
-          `Pi Orchestra: ${msg}`,
+          `PiNodes Orchestra: ${msg}`,
           "Show Logs",
         );
         if (pick === "Show Logs") backend.showLogs();
       }
     }),
-    vscode.commands.registerCommand("piOrchestra.restartBackend", async () => {
+    vscode.commands.registerCommand("pinodesOrchestra.restartBackend", async () => {
       await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: "Restarting Pi Orchestra backend…" },
+        { location: vscode.ProgressLocation.Notification, title: "Restarting PiNodes Orchestra backend…" },
         () => backend.restart(),
       );
     }),
-    vscode.commands.registerCommand("piOrchestra.stopBackend", () => backend.stop()),
-    vscode.commands.registerCommand("piOrchestra.showLogs", () => backend.showLogs()),
+    vscode.commands.registerCommand("pinodesOrchestra.stopBackend", () => backend.stop()),
+    vscode.commands.registerCommand("pinodesOrchestra.showLogs", () => backend.showLogs()),
   );
 }
 

@@ -28,17 +28,17 @@ async function loadExtension() {
 
 describe("handoffExtension", () => {
   beforeEach(() => {
-    process.env.PI_ORCHESTRA_URL = "http://localhost:3847";
-    process.env.PI_ORCHESTRA_BOARD = "board-1";
-    process.env.PI_ORCHESTRA_NODE = "node-a";
+    process.env.PINODES_ORCHESTRA_URL = "http://localhost:3847";
+    process.env.PINODES_ORCHESTRA_BOARD = "board-1";
+    process.env.PINODES_ORCHESTRA_NODE = "node-a";
     vi.stubGlobal("fetch", vi.fn());
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
-    delete process.env.PI_ORCHESTRA_URL;
-    delete process.env.PI_ORCHESTRA_BOARD;
-    delete process.env.PI_ORCHESTRA_NODE;
+    delete process.env.PINODES_ORCHESTRA_URL;
+    delete process.env.PINODES_ORCHESTRA_BOARD;
+    delete process.env.PINODES_ORCHESTRA_NODE;
   });
 
   it("delivers a handoff block to the target node", async () => {

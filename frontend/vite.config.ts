@@ -13,8 +13,8 @@ export default defineConfig({
       // down any existing SW) when embedded in a host like the VS Code webview.
       injectRegister: null,
       manifest: {
-        name: "pi-orchestra",
-        short_name: "pi-orchestra",
+        name: "PiNodes Orchestra",
+        short_name: "PiNodes Orchestra",
         description: "Visual multi-agent pi console orchestrator",
         theme_color: "#09090b",
         background_color: "#09090b",

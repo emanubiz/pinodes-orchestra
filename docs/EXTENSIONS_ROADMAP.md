@@ -1,6 +1,6 @@
 # Extensions roadmap
 
-How **pi-orchestra** integrates as a tab/panel in VSCode, Cursor, Hermes Desktop, and OpenClaw — without replacing its core identity as a **visual orchestration console**.
+How **pinodes-orchestra** integrates as a tab/panel in VSCode, Cursor, Hermes Desktop, and OpenClaw — without replacing its core identity as a **visual orchestration console**.
 
 > **Scope of this document:** design and sequencing. The **VS Code extension is implemented** (MVP, `vscode-extension/`); the remaining hosts are future work. Standalone (browser/PWA) is the reference implementation.
 
@@ -94,17 +94,17 @@ Handoff: same `@@HANDOFF` block or structured `call_agent` if Cursor exposes it.
 
 Lives in [`vscode-extension/`](../vscode-extension/README.md).
 
-**Placement:** Activity Bar → **Pi Orchestra** → control view (status + launcher) + a full editor-area webview panel (not the Agent Chat window).
+**Placement:** Activity Bar → **PiNodes Orchestra** → control view (status + launcher) + a full editor-area webview panel (not the Agent Chat window).
 
 ```
 VSCode Workbench
-  Activity Bar [Pi Orchestra icon]
+  Activity Bar [PiNodes Orchestra icon]
     └─ Webview Panel
          ├─ FlowCanvas
          ├─ TerminalPanel (xterm)
          └─ Kanban
   Extension Host
-    └─ pi-orchestra backend subprocess (or in-process PtyHub)
+    └─ pinodes-orchestra backend subprocess (or in-process PtyHub)
 ```
 
 | Component | Strategy | Status |
@@ -121,7 +121,7 @@ The embedded-mode contract lives in `frontend/src/lib/embed.ts` (reads `embed`/`
 
 **Still open:**
 
-- Bundle `backend/` + `frontend/dist` into the `.vsix` so it installs without a repo checkout (today the extension references the built backend via `piOrchestra.backendEntry`).
+- Bundle `backend/` + `frontend/dist` into the `.vsix` so it installs without a repo checkout (today the extension references the built backend via `pinodesOrchestra.backendEntry`).
 - Multi-root workspace handling (currently binds to the first folder).
 - Configurable port (the standalone frontend resolves its API same-origin only on `3847`).
 
@@ -175,7 +175,7 @@ Hermes Desktop
 
 #### Phase H1 — Side-by-side (no Hermes changes)
 
-- User runs `npm run dev` for pi-orchestra
+- User runs `npm run dev` for pinodes-orchestra
 - Uses Orchestra in browser while Hermes Desktop open
 - Document in [HERMES_DESKTOP.md](./HERMES_DESKTOP.md)
 
@@ -186,20 +186,20 @@ Hermes Desktop is Electron. Add:
 1. Sidebar nav entry "Orchestra"
 2. `BrowserView` or sandboxed iframe to Orchestra URL
 3. Settings: `orchestra.url` (default `http://127.0.0.1:3847`)
-4. On tab open: ensure backend running (spawn `pi-orchestra` subprocess or check health)
+4. On tab open: ensure backend running (spawn `pinodes-orchestra` subprocess or check health)
 
-**pi-orchestra deliverables for H2:**
+**pinodes-orchestra deliverables for H2:**
 
 - Stable `/api/health` + `/api/info` ✅
 - Programmatic API (see [PROGRAMMATIC_API.md](./PROGRAMMATIC_API.md))
-- Optional: `pi-orchestra serve --port 3847` single binary
+- Optional: `pinodes-orchestra serve --port 3847` single binary
 
 #### Phase H3 — Hermes-native nodes
 
 - `HermesRuntime` replaces pi spawn for `runtime: "hermes"` nodes
 - Orchestra tab unchanged; backends swap per node type
 
-**Who implements H2:** Hermes Desktop team or fork; pi-orchestra provides embed contract.
+**Who implements H2:** Hermes Desktop team or fork; pinodes-orchestra provides embed contract.
 
 **Effort:** H1 = 0, H2 = ~1–2 weeks (Hermes side) + API P0 endpoints, H3 = ~3–4 weeks.
 
@@ -219,7 +219,7 @@ OpenClaw documents two integration paths:
 #### Phase O1 — External Gateway client
 
 ```
-pi-orchestra UI  ──WS──►  OpenClaw Gateway :18789
+pinodes-orchestra UI  ──WS──►  OpenClaw Gateway :18789
                               └─ agent RPC per node (runtime: openclaw)
 ```
 

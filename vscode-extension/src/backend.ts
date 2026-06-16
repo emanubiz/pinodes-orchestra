@@ -6,7 +6,7 @@ import * as vscode from "vscode";
 export type BackendStatus = "stopped" | "starting" | "running" | "external" | "error";
 
 /**
- * Owns the pi-orchestra backend lifecycle for the extension.
+ * Owns the pinodes-orchestra backend lifecycle for the extension.
  *
  * Strategy (per docs/EXTENSIONS_ROADMAP.md, Phase 2): never run node-pty /
  * better-sqlite3 in-process inside the extension host. Instead spawn the
@@ -24,7 +24,7 @@ export class BackendManager {
   readonly onDidChangeStatus = this.onDidChangeEmitter.event;
 
   constructor(private readonly context: vscode.ExtensionContext) {
-    this.output = vscode.window.createOutputChannel("Pi Orchestra");
+    this.output = vscode.window.createOutputChannel("PiNodes Orchestra");
     context.subscriptions.push(this.output, this.onDidChangeEmitter);
   }
 
@@ -33,7 +33,7 @@ export class BackendManager {
   }
 
   get port(): number {
-    return vscode.workspace.getConfiguration("piOrchestra").get<number>("port", 3847);
+    return vscode.workspace.getConfiguration("pinodesOrchestra").get<number>("port", 3847);
   }
 
   get baseUrl(): string {
@@ -71,7 +71,7 @@ export class BackendManager {
 
   private resolveEntry(): string {
     const configured = vscode.workspace
-      .getConfiguration("piOrchestra")
+      .getConfiguration("pinodesOrchestra")
       .get<string>("backendEntry", "")
       .trim();
     if (configured) return configured;
@@ -88,13 +88,13 @@ export class BackendManager {
     const entry = this.resolveEntry();
     if (!fs.existsSync(entry)) {
       this.setStatus("error");
-      const msg = `Backend entry not found: ${entry}. Build it with \`npm run build\` in the pi-orchestra repo, or set "piOrchestra.backendEntry".`;
+      const msg = `Backend entry not found: ${entry}. Build it with \`npm run build\` in the pinodes-orchestra repo, or set "pinodesOrchestra.backendEntry".`;
       this.log(msg);
       throw new Error(msg);
     }
 
     const nodeCmd = vscode.workspace
-      .getConfiguration("piOrchestra")
+      .getConfiguration("pinodesOrchestra")
       .get<string>("nodeCommand", "node");
     const cwd = this.workspaceCwd() ?? path.dirname(path.dirname(entry));
 
@@ -129,7 +129,7 @@ export class BackendManager {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
       if (this._status === "stopped" || this._status === "error") {
-        throw new Error("Backend process exited before becoming healthy. See Pi Orchestra logs.");
+        throw new Error("Backend process exited before becoming healthy. See PiNodes Orchestra logs.");
       }
       if (await this.isHealthy()) {
         this.log(`Backend healthy on ${this.baseUrl}`);
@@ -139,7 +139,7 @@ export class BackendManager {
       await delay(400);
     }
     this.setStatus("error");
-    throw new Error(`Backend did not become healthy within ${timeoutMs / 1000}s. See Pi Orchestra logs.`);
+    throw new Error(`Backend did not become healthy within ${timeoutMs / 1000}s. See PiNodes Orchestra logs.`);
   }
 
   async isHealthy(): Promise<boolean> {
@@ -149,7 +149,7 @@ export class BackendManager {
       const res = await fetch(`${this.baseUrl}/api/health`, { signal: controller.signal });
       if (!res.ok) return false;
       const body = (await res.json()) as { ok?: boolean; name?: string };
-      return body.ok === true && body.name === "pi-orchestra";
+      return body.ok === true && body.name === "pinodes-orchestra";
     } catch {
       return false;
     } finally {
@@ -190,7 +190,7 @@ export class BackendManager {
   }
 
   private log(line: string): void {
-    this.output.appendLine(`[pi-orchestra] ${line}`);
+    this.output.appendLine(`[pinodes-orchestra] ${line}`);
   }
 
   dispose(): void {

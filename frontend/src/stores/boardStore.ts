@@ -98,7 +98,7 @@ export const useBoardStore = create<BoardState>()(
         })),
     }),
     {
-      name: "pi-orchestra-boards",
+      name: "pinodes-orchestra-boards",
       partialize: (s) => ({ boards: s.boards, activeBoardId: s.activeBoardId }),
       onRehydrateStorage: () => (state) => {
         if (state && !state.activeBoardId && state.boards[0]) {

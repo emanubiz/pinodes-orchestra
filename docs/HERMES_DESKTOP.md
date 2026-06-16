@@ -1,6 +1,6 @@
 # Hermes Desktop — integration analysis
 
-Reference for embedding **pi-orchestra** alongside Hermes Agent surfaces.
+Reference for embedding **pinodes-orchestra** alongside Hermes Agent surfaces.
 
 Sources: [Hermes Desktop docs](https://hermes-agent.nousresearch.com/docs/user-guide/desktop), [Web Dashboard](https://hermes-agent.nousresearch.com/docs/user-guide/features/web-dashboard), [Programmatic Integration](https://hermes-agent.nousresearch.com/docs/developer-guide/programmatic-integration).
 
@@ -35,7 +35,7 @@ On first launch, Desktop installs the Hermes runtime into `~/.hermes` (same layo
 
 Desktop also supports **remote backend**: Settings → Gateway → Remote gateway → URL of a running `hermes dashboard` on another machine.
 
-## Protocols relevant to pi-orchestra
+## Protocols relevant to pinodes-orchestra
 
 | Protocol | Transport | Fit for Orchestra |
 |----------|-----------|---------------------|
@@ -44,7 +44,7 @@ Desktop also supports **remote backend**: Settings → Gateway → Remote gatewa
 | **API server** | HTTP OpenAI-compat | ⚠️ Less control — no fine-grained steer/approval |
 | **Dashboard `/api/ws`** | WebSocket JSON-RPC | ✅ Same as TUI gateway; powers Chat tab |
 
-**Key insight:** Hermes Chat tab is literally the Ink TUI rendered via xterm.js through a PTY bridge to `tui_gateway`. pi-orchestra uses the same pattern (xterm.js + PTY) but orchestrates **many** sessions in a graph.
+**Key insight:** Hermes Chat tab is literally the Ink TUI rendered via xterm.js through a PTY bridge to `tui_gateway`. pinodes-orchestra uses the same pattern (xterm.js + PTY) but orchestrates **many** sessions in a graph.
 
 ## Remote backend requirements
 
@@ -58,14 +58,14 @@ If Orchestra runs against a remote `hermes dashboard`:
 
 Desktop readiness probe (`GET /api/status`) is weaker than live chat (`/api/ws`) — a 200 on status does not guarantee chat works.
 
-## Integration options for pi-orchestra
+## Integration options for pinodes-orchestra
 
 ### Option A — External web app (recommended first)
 
-Run pi-orchestra standalone (`npm run dev`) alongside Hermes Desktop. User alt-tabs between:
+Run pinodes-orchestra standalone (`npm run dev`) alongside Hermes Desktop. User alt-tabs between:
 
 - Hermes Desktop → single-agent chat, settings, skills
-- pi-orchestra → multi-agent visual graph
+- pinodes-orchestra → multi-agent visual graph
 
 **Pros:** zero Hermes code changes, full Orchestra UX preserved  
 **Cons:** two windows, no shared tab chrome
@@ -74,18 +74,18 @@ Run pi-orchestra standalone (`npm run dev`) alongside Hermes Desktop. User alt-t
 
 Hermes Desktop is Electron + React. A new sidebar item **Orchestra** could:
 
-1. Load pi-orchestra UI in an `<iframe>` or `BrowserView` pointing to `http://localhost:3847`
-2. Or bundle the Orchestra React app and talk to a local pi-orchestra backend subprocess
+1. Load pinodes-orchestra UI in an `<iframe>` or `BrowserView` pointing to `http://localhost:3847`
+2. Or bundle the Orchestra React app and talk to a local pinodes-orchestra backend subprocess
 
 ```
 Hermes Desktop sidebar
   ├─ Chat
   ├─ Files
-  ├─ Orchestra  ← NEW: webview → pi-orchestra backend
+  ├─ Orchestra  ← NEW: webview → pinodes-orchestra backend
   └─ Settings
 ```
 
-**Requires:** PR or plugin to Hermes Desktop (not a public extension API today). pi-orchestra side only needs stable HTTP + WS (already have).
+**Requires:** PR or plugin to Hermes Desktop (not a public extension API today). pinodes-orchestra side only needs stable HTTP + WS (already have).
 
 ### Option C — Hermes nodes instead of pi nodes
 
@@ -107,9 +107,9 @@ Replace `PtyHub` pi spawn with `HermesRuntime`:
 
 Useful as **satellite** so Hermes Chat can trigger flows, not as the visual canvas itself.
 
-## Hermes Desktop vs pi-orchestra positioning
+## Hermes Desktop vs pinodes-orchestra positioning
 
-| Dimension | Hermes Desktop Chat | pi-orchestra |
+| Dimension | Hermes Desktop Chat | pinodes-orchestra |
 |-----------|---------------------|--------------|
 | UX | Linear chat + tool cards | Graph + embedded terminals |
 | Agents | One (or Command Center lists) | Many parallel, topology explicit |
@@ -127,7 +127,7 @@ They are **complementary**, not competing. Orchestra is the "mission control" vi
 
 ## Recommended path
 
-1. **Now:** standalone pi-orchestra (reference impl)
+1. **Now:** standalone pinodes-orchestra (reference impl)
 2. **Next:** VSCode/Cursor webview extension (same UI, subprocess backend)
 3. **Then:** Hermes Desktop Orchestra tab via iframe to localhost backend (Option B)
 4. **Later:** `HermesRuntime` adapter for native Hermes nodes (Option C)

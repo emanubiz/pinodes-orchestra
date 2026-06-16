@@ -1,5 +1,5 @@
 {
-  "name": "pi-orchestra",
+  "name": "pinodes-orchestra",
   "private": true,
   "version": "0.1.0",
   "description": "Visual multi-agent pi console orchestrator (web/PWA)",

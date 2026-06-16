@@ -1,5 +1,5 @@
 /**
- * pi-orchestra · handoff extension
+ * pinodes-orchestra · handoff extension
  *
  * Loaded into every node's pi terminal via `-e`. Watches the agent's output and,
  * when it emits a hand-off block, delivers the task to a connected node (an
@@ -15,13 +15,13 @@
  *   @@END
  *
  * Identity + endpoint come from env at spawn time:
- *   PI_ORCHESTRA_URL · PI_ORCHESTRA_BOARD · PI_ORCHESTRA_NODE
+ *   PINODES_ORCHESTRA_URL · PINODES_ORCHESTRA_BOARD · PINODES_ORCHESTRA_NODE
  */
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-const BASE_URL = process.env.PI_ORCHESTRA_URL ?? "http://localhost:3847";
-const BOARD_ID = process.env.PI_ORCHESTRA_BOARD ?? "";
-const NODE_ID = process.env.PI_ORCHESTRA_NODE ?? "";
+const BASE_URL = process.env.PINODES_ORCHESTRA_URL ?? "http://localhost:3847";
+const BOARD_ID = process.env.PINODES_ORCHESTRA_BOARD ?? "";
+const NODE_ID = process.env.PINODES_ORCHESTRA_NODE ?? "";
 
 const HANDOFF_RE = /@@HANDOFF:\s*([^\s\n]+)\s*\n([\s\S]*?)@@END/g;
 const CARD_RE = /@@CARD:\s*([^\s\n]+)/g;

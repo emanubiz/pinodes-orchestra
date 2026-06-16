@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { BackendManager } from "./backend";
 
 /**
- * Full editor-area webview that embeds the standalone pi-orchestra UI in an
+ * Full editor-area webview that embeds the standalone pinodes-orchestra UI in an
  * iframe pointing at the local backend. The backend already serves the built
  * frontend (React Flow + xterm) on `/`, so we just need to frame it; live PTY
  * WebSockets run inside the iframe against its own (backend) origin.
@@ -19,18 +19,18 @@ export class OrchestraPanel {
     }
 
     const autoStart = vscode.workspace
-      .getConfiguration("piOrchestra")
+      .getConfiguration("pinodesOrchestra")
       .get<boolean>("autoStartBackend", true);
     if (autoStart) {
       await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: "Starting Pi Orchestra backend…" },
+        { location: vscode.ProgressLocation.Notification, title: "Starting PiNodes Orchestra backend…" },
         () => backend.ensureStarted(),
       );
     }
 
     const panel = vscode.window.createWebviewPanel(
-      "piOrchestra.panel",
-      "Pi Orchestra",
+      "pinodesOrchestra.panel",
+      "PiNodes Orchestra",
       vscode.ViewColumn.Active,
       { enableScripts: true, retainContextWhenHidden: true },
     );
@@ -101,7 +101,7 @@ function renderHtml(webview: vscode.Webview, src: string): string {
   <iframe id="app" src="${src}" allow="clipboard-read; clipboard-write"></iframe>
   <div id="fallback">
     <div>
-      <p>Pi Orchestra backend is not reachable.</p>
+      <p>PiNodes Orchestra backend is not reachable.</p>
       <button onclick="reload()">Retry</button>
     </div>
   </div>

@@ -9,10 +9,10 @@ import type { NodeStatus, WorkflowEdge, WorkflowGraph, WorkflowNode } from "../t
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MAX_BUFFER = 256_000; // scrollback kept per node for re-attach
 const PORT = Number(
-  process.env.PI_ORCHESTRA_PORT ?? process.env.PORT ?? 3847,
+  process.env.PINODES_ORCHESTRA_PORT ?? process.env.PORT ?? 3847,
 );
 const BASE_URL =
-  process.env.PI_ORCHESTRA_URL ?? `http://localhost:${PORT}`;
+  process.env.PINODES_ORCHESTRA_URL ?? `http://localhost:${PORT}`;
 const EXTENSION_PATH = path.resolve(__dirname, "../../pi-extensions/call-agent.ts");
 
 type BroadcastFn = (msg: Record<string, unknown>) => void;
@@ -55,7 +55,7 @@ function resolvePiCommand(): { file: string; baseArgs: string[] } {
   const piBin = findInPath("pi");
   if (piBin) return { file: piBin, baseArgs: [] };
   console.error(
-    "pi-orchestra: pi CLI not found. Install `@earendil-works/pi-coding-agent` globally (npm i -g) " +
+    "pinodes-orchestra: pi CLI not found. Install `@earendil-works/pi-coding-agent` globally (npm i -g) " +
       "or run `npm install` in the `backend` folder.",
   );
   return { file: "pi", baseArgs: [] };
@@ -293,7 +293,7 @@ export class PtyHub {
     ];
     if (fs.existsSync(EXTENSION_PATH)) args.push("--extension", EXTENSION_PATH);
 
-    console.log("pi-orchestra: spawning pi", this.cmd.file, args);
+    console.log("pinodes-orchestra: spawning pi", this.cmd.file, args);
     const term = pty.spawn(this.cmd.file, args, {
       name: "xterm-256color",
       cols,
@@ -301,9 +301,9 @@ export class PtyHub {
       cwd,
       env: {
         ...process.env,
-        PI_ORCHESTRA_URL: BASE_URL,
-        PI_ORCHESTRA_BOARD: boardId,
-        PI_ORCHESTRA_NODE: nodeId,
+        PINODES_ORCHESTRA_URL: BASE_URL,
+        PINODES_ORCHESTRA_BOARD: boardId,
+        PINODES_ORCHESTRA_NODE: nodeId,
       } as Record<string, string>,
     });
 

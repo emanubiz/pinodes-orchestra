@@ -17,7 +17,7 @@ REST and CLI surface for **host integrations** — Hermes Desktop tab, OpenClaw 
 http://localhost:3847   # default standalone
 ```
 
-Listen port is set by `PORT` (default 3847). `PI_ORCHESTRA_URL` overrides the callback URL pi nodes use, not the port clients connect to.
+Listen port is set by `PORT` (default 3847). `PINODES_ORCHESTRA_URL` overrides the callback URL pi nodes use, not the port clients connect to.
 
 ---
 
@@ -224,13 +224,13 @@ curl -s http://localhost:3847/api/v1/orchestra/flows \
 Standalone localhost deployments can run with no auth (default). For remote embeds, set the environment variable:
 
 ```bash
-PI_ORCHESTRA_TOKEN=<shared-secret>
+PINODES_ORCHESTRA_TOKEN=<shared-secret>
 ```
 
 When set, every `/api/v1/orchestra/*` request must include one of:
 
 ```http
-X-Pi-Orchestra-Token: <shared-secret>
+X-PiNodes-Orchestra-Token: <shared-secret>
 # or
 Authorization: Bearer <shared-secret>
 ```
@@ -242,10 +242,10 @@ Missing or invalid tokens receive `401 Unauthorized`.
 ## Planned — CLI
 
 ```bash
-pi-orchestra run --cwd ./my-repo --workflow <id> --message "Implement feature X"
-pi-orchestra run --graph flow.json --entry <nodeId> --message "..."
-pi-orchestra status --board <boardId>
-pi-orchestra stop --board <boardId>
+pinodes-orchestra run --cwd ./my-repo --workflow <id> --message "Implement feature X"
+pinodes-orchestra run --graph flow.json --entry <nodeId> --message "..."
+pinodes-orchestra status --board <boardId>
+pinodes-orchestra stop --board <boardId>
 ```
 
 Wraps the REST API above. Useful for OpenClaw cron, Hermes scripts, CI.

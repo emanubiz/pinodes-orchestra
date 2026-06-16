@@ -1,10 +1,10 @@
 {
-  "name": "pi-orchestra-vscode",
-  "displayName": "Pi Orchestra",
+  "name": "pinodes-orchestra-vscode",
+  "displayName": "PiNodes Orchestra",
   "description": "Visual multi-agent pi console orchestrator inside VS Code — graph canvas, live terminals, visible handoffs.",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
-  "publisher": "pi-orchestra",
+  "publisher": "emanubiz",
   "license": "MIT",
   "engines": {
     "vscode": "^1.85.0"
@@ -27,85 +27,85 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "piOrchestra",
-          "title": "Pi Orchestra",
+          "id": "pinodesOrchestra",
+          "title": "PiNodes Orchestra",
           "icon": "media/activity-icon.svg"
         }
       ]
     },
     "views": {
-      "piOrchestra": [
+      "pinodesOrchestra": [
         {
           "type": "webview",
-          "id": "piOrchestra.control",
-          "name": "Pi Orchestra"
+          "id": "pinodesOrchestra.control",
+          "name": "PiNodes Orchestra"
         }
       ]
     },
     "commands": [
       {
-        "command": "piOrchestra.open",
-        "title": "Open Pi Orchestra",
-        "category": "Pi Orchestra",
+        "command": "pinodesOrchestra.open",
+        "title": "Open PiNodes Orchestra",
+        "category": "PiNodes Orchestra",
         "icon": "$(window)"
       },
       {
-        "command": "piOrchestra.restartBackend",
+        "command": "pinodesOrchestra.restartBackend",
         "title": "Restart Backend",
-        "category": "Pi Orchestra",
+        "category": "PiNodes Orchestra",
         "icon": "$(debug-restart)"
       },
       {
-        "command": "piOrchestra.stopBackend",
+        "command": "pinodesOrchestra.stopBackend",
         "title": "Stop Backend",
-        "category": "Pi Orchestra",
+        "category": "PiNodes Orchestra",
         "icon": "$(debug-stop)"
       },
       {
-        "command": "piOrchestra.showLogs",
+        "command": "pinodesOrchestra.showLogs",
         "title": "Show Backend Logs",
-        "category": "Pi Orchestra",
+        "category": "PiNodes Orchestra",
         "icon": "$(output)"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "piOrchestra.open",
-          "when": "view == piOrchestra.control",
+          "command": "pinodesOrchestra.open",
+          "when": "view == pinodesOrchestra.control",
           "group": "navigation@1"
         },
         {
-          "command": "piOrchestra.restartBackend",
-          "when": "view == piOrchestra.control",
+          "command": "pinodesOrchestra.restartBackend",
+          "when": "view == pinodesOrchestra.control",
           "group": "navigation@2"
         },
         {
-          "command": "piOrchestra.showLogs",
-          "when": "view == piOrchestra.control",
+          "command": "pinodesOrchestra.showLogs",
+          "when": "view == pinodesOrchestra.control",
           "group": "navigation@3"
         }
       ]
     },
     "configuration": {
-      "title": "Pi Orchestra",
+      "title": "PiNodes Orchestra",
       "properties": {
-        "piOrchestra.port": {
+        "pinodesOrchestra.port": {
           "type": "number",
           "default": 3847,
-          "markdownDescription": "Port the pi-orchestra backend listens on. **Note:** the bundled frontend resolves its API on the same origin only for the default port `3847`; change this only if you rebuild the frontend with a matching `VITE_API_BASE`."
+          "markdownDescription": "Port the pinodes-orchestra backend listens on. **Note:** the bundled frontend resolves its API on the same origin only for the default port `3847`; change this only if you rebuild the frontend with a matching `VITE_API_BASE`."
         },
-        "piOrchestra.nodeCommand": {
+        "pinodesOrchestra.nodeCommand": {
           "type": "string",
           "default": "node",
           "description": "Command used to run the backend (must be a Node.js 22+ runtime on your PATH)."
         },
-        "piOrchestra.backendEntry": {
+        "pinodesOrchestra.backendEntry": {
           "type": "string",
           "default": "",
           "description": "Absolute path to the backend entry (backend/dist/index.js). Leave empty to auto-resolve relative to the extension."
         },
-        "piOrchestra.autoStartBackend": {
+        "pinodesOrchestra.autoStartBackend": {
           "type": "boolean",
           "default": true,
           "description": "Automatically start the backend subprocess when the panel opens (if one is not already running)."

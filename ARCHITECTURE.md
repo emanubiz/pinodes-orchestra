@@ -1,4 +1,4 @@
-# pi-orchestra — Architecture
+# pinodes-orchestra — Architecture
 
 Visual canvas of **pi** agent terminals connected in a graph. Semi-automatic pipeline with human intervention on any node.
 
@@ -92,12 +92,12 @@ Valid columns: `todo`, `in_progress`, `test`, `review`, `done`.
 | Orchestration | Node.js + `node-pty` + pi CLI + `BoardManager` |
 | Handoff hook | pi extension (`call-agent.ts`) |
 | Storage | SQLite (`better-sqlite3`) — prompts, workflows, boards |
-| Auth (optional) | `PI_ORCHESTRA_TOKEN` — shared-secret for programmatic API |
+| Auth (optional) | `PINODES_ORCHESTRA_TOKEN` — shared-secret for programmatic API |
 
 ## Project layout
 
 ```
-pi-orchestra/
+pinodes-orchestra/
 ├── ARCHITECTURE.md          # this file
 ├── README.md
 ├── docs/
@@ -180,11 +180,11 @@ See [docs/PROGRAMMATIC_API.md](./docs/PROGRAMMATIC_API.md) for the full programm
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `PORT` | `3847` | Backend listen port |
-| `PI_ORCHESTRA_URL` | `http://localhost:<port>` | Callback URL injected into pi nodes |
-| `PI_ORCHESTRA_PORT` | `PORT` | Overrides only the port in that callback URL — **not** the listen port |
-| `PI_ORCHESTRA_ROOT` | repo root | Bundled prompts location |
-| `PI_ORCHESTRA_DATA_DIR` | `<root>/data` | SQLite database directory |
-| `PI_ORCHESTRA_TOKEN` | (empty — no auth) | Shared secret for programmatic API auth |
+| `PINODES_ORCHESTRA_URL` | `http://localhost:<port>` | Callback URL injected into pi nodes |
+| `PINODES_ORCHESTRA_PORT` | `PORT` | Overrides only the port in that callback URL — **not** the listen port |
+| `PINODES_ORCHESTRA_ROOT` | repo root | Bundled prompts location |
+| `PINODES_ORCHESTRA_DATA_DIR` | `<root>/data` | SQLite database directory |
+| `PINODES_ORCHESTRA_TOKEN` | (empty — no auth) | Shared secret for programmatic API auth |
 | `VITE_API_BASE` | (empty) | Frontend build-time backend URL |
 
 ## Multi-board (repo tabs)
