@@ -47,12 +47,16 @@ sudo apt-get install -y build-essential python3
 
 ## Build Procedure (per machine)
 
-Clone the repo, then run from the extension directory:
+Clone the repo, then:
 
 ```bash
+# From the repo root: installs workspaces and COMPILES the native modules
+# (node-pty, better-sqlite3) for this machine's OS/arch + Node ABI.
+npm ci
+
 cd vscode-extension
-npm ci                    # Install dependencies (including native compilation)
-npm run vscode:prepublish # Compiles TS + runs bundle.mjs (assembles server/)
+npm install               # extension toolchain (vsce) — not pinned in its lockfile
+# `vsce package` runs vscode:prepublish (tsc + scripts/bundle.mjs → assembles server/)
 npx @vscode/vsce package --target <TARGET>
 ```
 
@@ -96,9 +100,16 @@ npx @vscode/vsce publish -p <PAT> -i pinodes-orchestra-vscode-darwin-arm64-<VERS
 
 The Marketplace automatically serves the correct VSIX to users based on their platform.
 
-## Automation (Future)
+## Automation
 
-A GitHub Actions workflow (`.github/workflows/publish-extension.yml`) can automate this matrix build on tag push. See `docs/ci-cd-extension.md` for the proposed workflow.
+A GitHub Actions workflow (`.github/workflows/publish-extension.yml`) automates
+the matrix build and publish:
+
+- **Push a `v*` tag** (e.g. `v0.2.1`) → builds all four VSIX files and publishes them.
+- **Manual run** (workflow_dispatch) → builds the VSIX artifacts only (no publish).
+
+Set the repository secret **`VSCE_PAT`** (Azure DevOps PAT with the
+`Marketplace: Manage` scope) for the publish step to run.
 
 ## Versioning
 

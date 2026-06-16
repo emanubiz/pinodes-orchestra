@@ -1,0 +1,96 @@
+name: Publish VS Code Extension
+
+# Builds one VSIX per platform (native modules — node-pty, better-sqlite3 — are
+# compiled on each runner) and, on a version tag, publishes them all to the
+# Marketplace. See docs/EXTENSION_PUBLISHING.md.
+#
+# Trigger:
+#   - push a tag like `v0.2.1`  → build + publish
+#   - manual run (workflow_dispatch) → build only (artifacts), no publish
+#
+# Required secret for publishing: VSCE_PAT (Azure DevOps PAT, Marketplace:Manage).
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Package (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x64
+          - os: windows-latest
+            target: win32-x64
+          - os: macos-13 # Intel
+            target: darwin-x64
+          - os: macos-14 # Apple Silicon
+            target: darwin-arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      # Root install builds the backend's native deps (node-pty, better-sqlite3)
+      # for THIS runner's OS/arch + Node ABI — the whole reason for a per-platform
+      # matrix. The lockfile must stay clean of local `file:` deps for `npm ci`.
+      - name: Install workspace (builds native modules)
+        run: npm ci
+
+      # vsce isn't pinned in the extension lockfile, so use install (not ci) here.
+      - name: Install extension toolchain
+        working-directory: vscode-extension
+        run: npm install
+
+      # `vsce package` runs `vscode:prepublish` (tsc + scripts/bundle.mjs), which
+      # assembles server/ with the freshly built native binaries for this target.
+      - name: Package VSIX
+        working-directory: vscode-extension
+        run: npx --no-install @vscode/vsce package --target ${{ matrix.target }} -o "pinodes-orchestra-${{ matrix.target }}.vsix"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vsix-${{ matrix.target }}
+          path: vscode-extension/pinodes-orchestra-${{ matrix.target }}.vsix
+          if-no-files-found: error
+
+  publish:
+    name: Publish to Marketplace
+    needs: build
+    # Only on a version tag, and only if the publish secret is configured.
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Download all VSIX artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: vsix
+          merge-multiple: true
+
+      - name: Publish every platform VSIX
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          if [ -z "$VSCE_PAT" ]; then
+            echo "::error::VSCE_PAT secret is not set — cannot publish."
+            exit 1
+          fi
+          for vsix in vsix/*.vsix; do
+            echo "Publishing $vsix"
+            npx --yes @vscode/vsce publish --packagePath "$vsix" -p "$VSCE_PAT"
+          done
