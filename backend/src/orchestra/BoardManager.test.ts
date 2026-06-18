@@ -98,7 +98,7 @@ describe("BoardManager", () => {
     const b1 = manager.create("/tmp", "A");
     const b2 = manager.create("/tmp", "B");
     manager.setGraph(b1.boardId, sampleGraph);
-    manager.setGraph(b2.boardId, { ...sampleGraph, nodes: [] });
+    manager.setGraph(b2.boardId, { ...sampleGraph, nodes: [], edges: [] });
 
     ptyHub.isNodeRunning = vi.fn(
       (boardId: string, nodeId: string) =>
