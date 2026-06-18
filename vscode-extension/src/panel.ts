@@ -42,12 +42,43 @@ export class OrchestraPanel {
     void this.render();
     this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
     this.panel.webview.onDidReceiveMessage(
-      (msg: { type?: string }) => {
+      (msg: { type?: string; action?: string; id?: number; text?: string }) => {
         if (msg?.type === "reload") void this.render();
+        if (msg?.type === "clipboard" && typeof msg.id === "number") {
+          void this.handleClipboard(msg.action, msg.id, msg.text);
+        }
       },
       null,
       this.disposables,
     );
+  }
+
+  private async handleClipboard(
+    action: string | undefined,
+    id: number,
+    text: string | undefined,
+  ): Promise<void> {
+    try {
+      if (action === "read") {
+        const clip = await vscode.env.clipboard.readText();
+        await this.panel.webview.postMessage({ type: "clipboard-result", id, text: clip });
+      } else if (action === "write") {
+        await vscode.env.clipboard.writeText(text ?? "");
+        await this.panel.webview.postMessage({ type: "clipboard-result", id });
+      } else {
+        await this.panel.webview.postMessage({
+          type: "clipboard-result",
+          id,
+          error: "unknown clipboard action",
+        });
+      }
+    } catch (err) {
+      await this.panel.webview.postMessage({
+        type: "clipboard-result",
+        id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   private async render(): Promise<void> {
@@ -130,6 +161,29 @@ function renderHtml(webview: vscode.Webview, src: string): string {
     frame.addEventListener('load', postTheme);
     window.addEventListener('message', function (e) {
       if (e.data && e.data.type === 'orchestra-ready') postTheme();
+      // Relay clipboard ops from the cross-origin iframe to the extension host,
+      // where vscode.env.clipboard works reliably (iframe Clipboard API does not).
+      if (e.source === frame.contentWindow && e.data && e.data.type === 'orchestra-clipboard') {
+        vscode.postMessage({
+          type: 'clipboard',
+          action: e.data.action,
+          id: e.data.id,
+          text: e.data.text,
+        });
+      }
+    });
+    // Extension → iframe: forward clipboard results back into the app.
+    window.addEventListener('message', function (e) {
+      var msg = e.data;
+      if (!msg || msg.type !== 'clipboard-result') return;
+      try {
+        frame.contentWindow && frame.contentWindow.postMessage({
+          type: 'orchestra-clipboard-result',
+          id: msg.id,
+          text: msg.text,
+          error: msg.error,
+        }, '*');
+      } catch (err) {}
     });
     // VS Code swaps the theme by mutating the body class + --vscode-* vars.
     new MutationObserver(postTheme).observe(document.body, {

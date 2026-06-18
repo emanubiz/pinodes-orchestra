@@ -1,12 +1,17 @@
 import type { Terminal } from "@xterm/xterm";
+import { IS_EMBEDDED } from "./embed";
+import { readClipboardViaHost, writeClipboardViaHost } from "./clipboardBridge";
 
 /**
  * Wire copy/paste onto an interactive xterm terminal. By default xterm forwards
  * every keystroke to the PTY, so neither Ctrl+Shift+C nor a right-click "Copy"
  * do anything. This adds:
- *   - Ctrl+Shift+C → copy the current selection
- *   - Ctrl+Shift+V → paste from the clipboard into the PTY
+ *   - Ctrl+Shift+C / Ctrl+Insert → copy the current selection
+ *   - Ctrl+Shift+V / Shift+Insert → paste from the clipboard into the PTY
  *   - right-click  → a small Copy/Paste context menu
+ *
+ * In embedded mode (VS Code webview iframe) the Clipboard API is blocked by the
+ * cross-origin frame, so reads/writes are relayed to the host via postMessage.
  *
  * Pure DOM (no React) so it can be dropped into any terminal component with a
  * single call; returns a cleanup function to detach everything.
@@ -16,22 +21,33 @@ export function attachClipboard(term: Terminal, host: HTMLElement): () => void {
 
   const copySelection = () => {
     const sel = term.getSelection();
-    if (sel) void navigator.clipboard.writeText(sel);
+    if (!sel) return;
+    void writeClipboardText(sel);
   };
+
   const paste = async () => {
-    try {
-      const text = await navigator.clipboard.readText();
-      if (text) term.paste(text);
-    } catch {
-      // clipboard read denied — nothing we can do
-    }
+    const text = await readClipboardText();
+    if (text) term.paste(text);
   };
 
   // Keyboard: swallow the shortcuts so they don't reach the PTY (returning
   // false tells xterm not to process the event).
   term.attachCustomKeyEventHandler((e) => {
-    if (e.type !== "keydown" || !e.ctrlKey || !e.shiftKey) return true;
+    if (e.type !== "keydown") return true;
+
     const k = e.key.toLowerCase();
+
+    // Linux / Windows terminal conventions.
+    if (e.shiftKey && k === "insert") {
+      void paste();
+      return false;
+    }
+    if (e.ctrlKey && !e.shiftKey && !e.altKey && k === "insert") {
+      copySelection();
+      return false;
+    }
+
+    if (!e.ctrlKey || !e.shiftKey) return true;
     if (k === "c") {
       copySelection();
       return false;
@@ -99,10 +115,65 @@ export function attachClipboard(term: Terminal, host: HTMLElement): () => void {
     document.addEventListener("keydown", onEsc, true);
   };
 
+  // Linux primary-selection paste on middle-click.
+  const onMouseDown = (e: MouseEvent) => {
+    if (e.button !== 1) return;
+    e.preventDefault();
+    void paste();
+  };
+
   host.addEventListener("contextmenu", onContextMenu);
+  host.addEventListener("mousedown", onMouseDown);
 
   return () => {
     host.removeEventListener("contextmenu", onContextMenu);
+    host.removeEventListener("mousedown", onMouseDown);
     closeMenu();
   };
+}
+
+async function readClipboardText(): Promise<string> {
+  if (IS_EMBEDDED) {
+    try {
+      return await readClipboardViaHost();
+    } catch {
+      /* fall through to direct API */
+    }
+  }
+  try {
+    return await navigator.clipboard.readText();
+  } catch {
+    return "";
+  }
+}
+
+async function writeClipboardText(text: string): Promise<void> {
+  if (IS_EMBEDDED) {
+    try {
+      await writeClipboardViaHost(text);
+      return;
+    } catch {
+      /* fall through */
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    return;
+  } catch {
+    copyWithExecCommand(text);
+  }
+}
+
+function copyWithExecCommand(text: string): void {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0;";
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand("copy");
+  } finally {
+    ta.remove();
+  }
 }

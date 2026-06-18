@@ -2,6 +2,16 @@
 
 All notable changes to the **PiNodes Orchestra** extension are documented here.
 
+## 0.2.13
+
+### Fixed
+
+- **Linux / VS Code: copy/paste in pi terminals did nothing.** The UI runs in a
+  cross-origin iframe inside the editor webview, where the browser Clipboard API
+  is blocked. Clipboard reads/writes are now relayed through the extension host
+  (`vscode.env.clipboard`). Also added Shift+Insert / Ctrl+Insert and
+  middle-click paste for Linux terminal conventions.
+
 ## 0.2.12
 
 ### Fixed
