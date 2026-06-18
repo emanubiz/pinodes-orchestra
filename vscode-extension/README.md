@@ -45,7 +45,9 @@ VS Code
 
 ## Requirements
 
-- **Node.js 22+** on your `PATH` (used to run the backend subprocess).
+- **Node.js 24.x** on your `PATH` (used to run the backend subprocess). The
+  published VSIX ships native binaries (`node-pty`, `better-sqlite3`) built for
+  Node 24 (ABI 137); older majors like Node 22 (ABI 127) fail to load them.
 - A **built backend + frontend** in the repo: from the repo root run
   ```bash
   npm install && npm run build
