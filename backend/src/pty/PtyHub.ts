@@ -40,13 +40,19 @@ interface Session {
   startedAt: number;
 }
 
-/** Search an executable in PATH. */
-function findInPath(name: string): string | undefined {
+// On Windows the `pi` launcher is `pi.cmd` (npm shim); `pi` with no extension
+// does not exist, so spawning it verbatim fails with ENOENT.
+const PI_BIN_NAMES = process.platform === "win32" ? ["pi.cmd", "pi.exe", "pi.bat", "pi"] : ["pi"];
+
+/** Search an executable in PATH, trying platform-specific extensions. */
+function findInPath(names: string[]): string | undefined {
   const pathVar = process.env.PATH ?? "";
   for (const dir of pathVar.split(path.delimiter)) {
-    const candidate = path.join(dir, name);
-    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
-      return candidate;
+    for (const name of names) {
+      const candidate = path.join(dir, name);
+      if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+        return candidate;
+      }
     }
   }
   return undefined;
@@ -61,13 +67,13 @@ function resolvePiCommand(): { file: string; baseArgs: string[] } {
   for (const c of candidates) {
     if (fs.existsSync(c)) return { file: process.execPath, baseArgs: [c] };
   }
-  const piBin = findInPath("pi");
+  const piBin = findInPath(PI_BIN_NAMES);
   if (piBin) return { file: piBin, baseArgs: [] };
   console.error(
     "pinodes-orchestra: pi CLI not found. Install `@earendil-works/pi-coding-agent` globally (npm i -g) " +
       "or run `npm install` in the `backend` folder.",
   );
-  return { file: "pi", baseArgs: [] };
+  return { file: PI_BIN_NAMES[0], baseArgs: [] };
 }
 
 function key(boardId: string, nodeId: string): string {

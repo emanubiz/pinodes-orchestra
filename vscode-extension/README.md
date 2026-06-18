@@ -51,7 +51,10 @@ VS Code
   npm install && npm run build
   ```
 - `@earendil-works/pi-coding-agent` available to the backend, and pi auth/keys
-  (see the repo README) for agent nodes to actually run.
+  (see the repo README) for agent nodes to actually run. On **Windows** the npm
+  launcher is `pi.cmd`; the backend resolves it automatically (it tries
+  `pi.cmd`/`pi.exe`/`pi.bat`/`pi` on `PATH`), so a global `npm i -g` install just
+  works.
 
 ## Develop / run locally
 
