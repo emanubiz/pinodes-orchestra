@@ -2,6 +2,22 @@
 
 All notable changes to the **PiNodes Orchestra** extension are documented here.
 
+## 0.2.12
+
+### Fixed
+
+- **Intent watchdog crashed at end-of-turn on pi 0.79+.** When a pipeline node
+  finished without `@@HANDOFF` or `@@DONE`, the extension injected
+  `[orchestra:confirm]` at `agent_end` without `deliverAs`. Pi still considered
+  the agent "processing" and threw *Agent is already processing. Specify
+  streamingBehavior ('steer' or 'followUp')* — so the confirm never reached the
+  model and nodes appeared to stop silently. The confirm is now queued with
+  `{ deliverAs: "followUp" }`.
+- **False `@@DONE` skipped the watchdog.** A regex matched `@@DONE` anywhere in
+  the response, so an agent explaining the protocol (e.g. "you can close with
+  `@@DONE`") was treated as having declared completion. Terminal intent now
+  requires `@@DONE` alone on the last non-empty line of the answer.
+
 ## 0.2.11
 
 ### Fixed

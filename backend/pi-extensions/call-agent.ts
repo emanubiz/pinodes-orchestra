@@ -45,7 +45,16 @@ const MAX_CONFIRM = Number(process.env.PINODES_ORCHESTRA_MAX_STEER_RETRIES ?? 2)
 
 const HANDOFF_RE = /@@HANDOFF:\s*([^\s\n]+)\s*\n([\s\S]*?)@@END/g;
 const CARD_RE = /@@CARD:\s*([^\s\n]+)/g;
-const DONE_RE = /@@DONE\b/;
+
+/** Terminal intent: @@DONE alone on the last non-empty line (not prose mentioning it). */
+function hasExplicitDone(text: string): boolean {
+  for (const line of text.trim().split(/\r?\n/).reverse()) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    return /^@@DONE\s*$/.test(trimmed);
+  }
+  return false;
+}
 
 // Marks the orchestration appendix inside the system prompt so it can be
 // stripped and re-appended every loop. This makes the per-turn refresh robust
@@ -273,8 +282,11 @@ async function enforceIntent(pi: ExtensionAPI, delivered: number, hasDone: boole
   }
 
   confirmAttempts += 1;
-  // Idle agent → this becomes the next input and starts a fresh loop.
-  pi.sendUserMessage(buildConfirm(ctx, nonFinal, hasDone));
+  // agent_end can fire while pi still considers the agent "processing". Queue the
+  // confirm as a follow-up so pi drains it and continues the loop (see agent-session
+  // _handlePostAgentRun → hasQueuedMessages). Without deliverAs this throws:
+  // "Agent is already processing. Specify streamingBehavior ('steer' or 'followUp')".
+  pi.sendUserMessage(buildConfirm(ctx, nonFinal, hasDone), { deliverAs: "followUp" });
 }
 
 export default function handoffExtension(pi: ExtensionAPI) {
@@ -305,6 +317,6 @@ export default function handoffExtension(pi: ExtensionAPI) {
 
     await deliverCards(text);
     const delivered = await deliverHandoffs(text);
-    await enforceIntent(pi, delivered, DONE_RE.test(text));
+    await enforceIntent(pi, delivered, hasExplicitDone(text));
   });
 }

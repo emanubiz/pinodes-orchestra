@@ -335,9 +335,23 @@ describe("handoffExtension", () => {
 
     await runLoop(pi, "I think that covers it.");
     expect(pi.sendUserMessage).toHaveBeenCalledTimes(1);
-    const [text] = pi.sendUserMessage.mock.calls[0];
+    const [text, opts] = pi.sendUserMessage.mock.calls[0];
     expect(text).toContain("@@DONE");
     expect(text).toContain("developer-1");
+    expect(opts).toEqual({ deliverAs: "followUp" });
+  });
+
+  it("still asks when @@DONE appears only in explanatory prose (PM-style)", async () => {
+    ctxResponse = ctxFinalOutgoing;
+    const pi = createMockPi();
+    installFetch();
+    (await loadExtension())(pi as never);
+
+    await runLoop(
+      pi,
+      "Confirmed: I can close with `@@DONE` or hand off downstream.\n\nWhat is the project goal?",
+    );
+    expect(pi.sendUserMessage).toHaveBeenCalledTimes(1);
   });
 
   it("asks a non-final node that emitted no handoff", async () => {
@@ -348,9 +362,10 @@ describe("handoffExtension", () => {
 
     await runLoop(pi, "I'm finished.");
     expect(pi.sendUserMessage).toHaveBeenCalledTimes(1);
-    const [text] = pi.sendUserMessage.mock.calls[0];
+    const [text, opts] = pi.sendUserMessage.mock.calls[0];
     expect(text).toContain("developer-1");
     expect(text).toContain("qa-1");
+    expect(opts).toEqual({ deliverAs: "followUp" });
   });
 
   it("rejects @@DONE from a non-final node (asks it to hand off)", async () => {
