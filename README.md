@@ -65,7 +65,7 @@ Details: [`vscode-extension/README.md`](./vscode-extension/README.md),
 
 ## Requirements
 
-- Node.js 22+
+- Node.js 24.x (native modules `node-pty`/`better-sqlite3` are built for Node 24 / ABI 137)
 - `@earendil-works/pi-coding-agent` globally or in `backend/node_modules`
 - API keys in `~/.pi/agent/auth.json` or env vars
 
