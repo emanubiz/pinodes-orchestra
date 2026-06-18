@@ -35,6 +35,9 @@ const serverDir = path.join(extRoot, "server");
 /** Dependency we never ship: the user installs the pi CLI themselves. */
 const EXCLUDE = new Set(["@earendil-works/pi-coding-agent"]);
 
+/** Platform we're bundling for (process.platform + process.arch). */
+const BUNDLE_PLATFORM = `${process.platform}-${process.arch}`;
+
 /** Packages with native binaries that need platform-specific filtering. */
 const NATIVE_PKGS = {
   "node-pty": {
@@ -46,8 +49,13 @@ const NATIVE_PKGS = {
       "lib/**",
       "build/Release/**",
     ],
-    // Only keep linux-x64 prebuild if present (fallback)
-    prebuildPlatform: "linux-x64",
+    // Recent node-pty ships its native binaries under prebuilds/<platform>/
+    // (prebuildify layout) instead of build/Release — on Windows that's where
+    // pty.node + conpty.node live. Copy the prebuild for THE TARGET platform so
+    // the loadable .node modules actually make it into the VSIX. (A previously
+    // hardcoded "linux-x64" here meant Windows/mac VSIXs shipped no pty binary,
+    // leaving agent nodes stuck on "starting pi".)
+    prebuildPlatform: BUNDLE_PLATFORM,
   },
   "better-sqlite3": {
     keep: [
@@ -67,9 +75,6 @@ function skipBuildJunk(src) {
   // libs, debug symbols); the runtime only needs the loadable *.node + dlls.
   return !/\.(o|obj|a|lib|pdb|tlog|lastbuildstate|recipe|ipdb|iobj|exp|ilk)$/i.test(b);
 }
-
-/** Platform we're bundling for (process.platform + process.arch). */
-const BUNDLE_PLATFORM = `${process.platform}-${process.arch}`;
 
 const log = (m) => console.log(`[bundle] ${m}`);
 
@@ -132,7 +137,9 @@ function copyPkgFiltered(name, src, dest) {
   // Always copy kept patterns
   copyPatterns(spec.keep, src, dest);
 
-  // For node-pty, also copy the linux-x64 prebuild as fallback (if no build/Release)
+  // For node-pty, copy the prebuildify-layout native binaries for the target
+  // platform (prebuilds/<platform>/*.node) — this is where pty.node/conpty.node
+  // live in recent versions, separate from build/Release.
   if (spec.prebuildPlatform) {
     const prebuildDir = path.join(src, "prebuilds", spec.prebuildPlatform);
     if (fs.existsSync(prebuildDir)) {
