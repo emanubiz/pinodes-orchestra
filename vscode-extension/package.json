@@ -2,7 +2,7 @@
   "name": "pinodes-orchestra-vscode",
   "displayName": "PiNodes Orchestra",
   "description": "Visual multi-agent pi console orchestrator inside VS Code — graph canvas, live terminals, visible handoffs.",
-  "version": "0.2.15",
+  "version": "0.2.16",
   "private": false,
   "publisher": "emanubiz",
   "license": "MIT",
@@ -97,8 +97,8 @@
       "properties": {
         "pinodesOrchestra.port": {
           "type": "number",
-          "default": 3847,
-          "markdownDescription": "Port the pinodes-orchestra backend listens on. **Note:** the bundled frontend resolves its API on the same origin only for the default port `3847`; change this only if you rebuild the frontend with a matching `VITE_API_BASE`."
+          "default": 0,
+          "markdownDescription": "Port the pinodes-orchestra backend listens on. **`0`** (default) picks the first free port starting at `3847` so each VS Code window gets its own backend. Set an explicit port only when you need a fixed value."
         },
         "pinodesOrchestra.nodeCommand": {
           "type": "string",

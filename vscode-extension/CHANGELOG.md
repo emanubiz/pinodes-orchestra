@@ -2,6 +2,53 @@
 
 All notable changes to the **PiNodes Orchestra** extension are documented here.
 
+## 0.2.16
+
+### Added
+
+- **One backend per window (multi-instance).** Each VS Code window now spawns its
+  **own** backend on a dedicated port with an isolated SQLite directory keyed by
+  the workspace path, so multiple windows run in parallel without sharing state.
+  Two windows opened on different folders now both work; previously the second
+  window adopted the first window's backend and failed authentication.
+  - **Free-port allocation.** `port.ts` (`findFreePort`/`isPortFree`) picks the
+    first free port starting at `3847`. The `pinodesOrchestra.port` setting now
+    defaults to `0` (auto-allocate); set a fixed value only when you need one.
+  - **Per-workspace database.** `workspaceDataDir.ts` derives
+    `globalStorage/instances/<sha256(workspacePath)[:16]>` and is always passed as
+    `PINODES_ORCHESTRA_DATA_DIR` (previously set only for the bundled layout). A
+    one-time `migrateLegacyDb()` copies an existing flat database into the new
+    per-workspace folder so older boards survive.
+  - **No more adoption.** `BackendManager.ensureStarted()` no longer health-checks
+    `3847` and adopts an existing backend; it always launches this window's own.
+    The `"external"` backend status was removed accordingly. A pinned port already
+    served by another orchestra backend now fails fast with a clear error.
+
+### Fixed
+
+- **Frontend API resolution no longer hardcodes `3847`.** `resolveBase()` (split into
+  the pure, unit-tested `resolveBaseForLocation()`) now returns same-origin for any
+  http(s) port, so a backend on `3848+` is reached correctly inside the webview
+  iframe instead of having its requests sent to `localhost:3847`.
+
+### Changed
+
+- **Vite dev proxy is port-configurable** via `PINODES_ORCHESTRA_PORT` (default
+  `3847`) — dev-only convenience for a backend on a non-default port.
+
+### Docs
+
+- New [`docs/MULTI_INSTANCE.md`](../docs/MULTI_INSTANCE.md): the problem, the
+  per-window model, the code map, and why security is unchanged.
+- `README.md`, `ARCHITECTURE.md`, `vscode-extension/README.md`,
+  `docs/EXTENSIONS_ROADMAP.md`, `docs/SECURITY.md` updated to drop the obsolete
+  "single backend on `3847` / adopts an existing one" assumptions.
+
+### Tests
+
+- `vscode-extension/src/port.test.ts`, `vscode-extension/src/workspaceDataDir.test.ts`,
+  `frontend/src/lib/api.test.ts`.
+
 ## 0.2.15
 
 ### Fixed

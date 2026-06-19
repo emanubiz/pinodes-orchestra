@@ -27,7 +27,7 @@ same gap.
 | **CORS Origin allowlist** | Cross-origin browser fetches from malicious sites (`evil.com` → `/api/validate-path`, `/api/prompts`, …) | Same-origin requests; requests from extensions with `host_permissions`; `curl` / non-browser tools |
 | **WebSocket Origin check** | Cross-Site WebSocket Hijacking (CSWSH) from malicious pages | Same-origin WS connections; non-browser tools that don't send `Origin` |
 | **`PINODES_ORCHESTRA_TOKEN`** (opt-in) | All of the above + other local processes + browser extensions (when set) | Nothing on its own — it only adds value if the secret is NOT readable by the attacker |
-| **Ephemeral token in the VS Code extension** (automatic) | Other local processes connecting to `:3847` while the panel is open; malicious browser extensions | Processes that can read the extension host's memory (unlikely in practice) |
+| **Ephemeral token in the VS Code extension** (automatic) | Other local processes connecting to the backend port while the panel is open; malicious browser extensions | Processes that can read the extension host's memory (unlikely in practice) |
 
 ### Why a persisted default token doesn't help
 

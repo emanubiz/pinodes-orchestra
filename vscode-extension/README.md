@@ -29,7 +29,7 @@ You can also sideload a platform `.vsix` manually if you prefer.
 ```
 VS Code
 ├─ Activity Bar ▸ PiNodes Orchestra (control view: status + Open/Restart/Stop/Logs)
-├─ Command "Open PiNodes Orchestra" ▸ editor webview ▸ <iframe src=localhost:3847>
+├─ Command "Open PiNodes Orchestra" ▸ editor webview ▸ <iframe src=127.0.0.1:<port>>
 └─ Extension host ▸ spawns `node backend/dist/index.js` (cwd = workspace folder)
 ```
 
@@ -40,8 +40,12 @@ VS Code
   frontend **binds the single board to the workspace folder and hides the repo-tab
   switcher** (VS Code already owns the cwd), and **does not register the PWA service
   worker** (so the webview never serves a stale shell).
-- If a backend already answers on the port (e.g. you ran `npm run dev`), the
-  extension **adopts** it instead of spawning a second one.
+- **One backend per window.** Each VS Code window spawns its **own** backend on a
+  dedicated port (the first free port from `3847`) with an isolated SQLite directory
+  keyed by the workspace path, so two windows never share state. See
+  [docs/MULTI_INSTANCE.md](../docs/MULTI_INSTANCE.md). (Earlier versions adopted an
+  already-running backend on `3847`; that caused the second window to fail auth and
+  is no longer done.)
 
 ## Requirements
 
@@ -92,11 +96,11 @@ self-contained — backend + frontend are bundled under `server/`.
 
 | Setting | Default | Purpose |
 |---|---|---|
-| `pinodesOrchestra.port` | `3847` | Backend port. The bundled frontend resolves its API on the same origin only for `3847`; change only if you rebuild the frontend with a matching `VITE_API_BASE`. |
+| `pinodesOrchestra.port` | `0` | Backend port. **`0`** (default) picks the first free port starting at `3847`, so each window gets its own backend. Set a fixed value only when you need a stable port. |
 | `pinodesOrchestra.nodeCommand` | `node` | Node runtime used to launch the backend. |
 | `pinodesOrchestra.backendEntry` | _(auto)_ | Absolute path to `backend/dist/index.js`. Empty = resolve relative to the extension. |
 | `pinodesOrchestra.autoStartBackend` | `true` | Start the backend when the panel opens if none is running. |
-| `pinodesOrchestra.token` | _(auto)_ | Optional shared secret (`PINODES_ORCHESTRA_TOKEN`). Leave empty for normal local use — only needed for remote/LAN deployments. **When empty, the extension auto-generates an ephemeral token per session** so that the backend is always protected against other local processes or browser extensions connecting to `:3847`. |
+| `pinodesOrchestra.token` | _(auto)_ | Optional shared secret (`PINODES_ORCHESTRA_TOKEN`). Leave empty for normal local use — only needed for remote/LAN deployments. **When empty, the extension auto-generates an ephemeral token per session** so that the backend is always protected against other local processes or browser extensions connecting to its port. |
 
 ### Ephemeral auto-token
 
@@ -123,9 +127,6 @@ All links are absolute so they resolve from the Open VSX / Marketplace listing t
 
 ## Known limitations (MVP)
 
-- Single backend port assumption (`3847`) tied to the standalone frontend's
-  same-origin API resolution.
 - Multi-root workspace handling (currently binds to the first folder).
-- Configurable port (the standalone frontend resolves its API same-origin only on `3847`).
 - Native `runtime: "cursor"` nodes (spawn Cursor agent directly) remain planned;
   pi nodes work today in Cursor/Windsurf via the same extension.

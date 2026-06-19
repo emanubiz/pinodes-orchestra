@@ -37,7 +37,9 @@ In Chrome/Edge, use the browser **Install** action. The service worker caches st
 The same VS Code–compatible extension (`vscode-extension/`) embeds the canvas
 in an editor webview. It bundles a self-contained backend (native modules per
 platform) and binds the board to the open workspace folder — no repo-tab
-switcher, since the IDE already owns the cwd.
+switcher, since the IDE already owns the cwd. Each window runs its **own**
+backend on its own port with an isolated database, so multiple windows work in
+parallel without sharing state (see [docs/MULTI_INSTANCE.md](./docs/MULTI_INSTANCE.md)).
 
 **Recommended — install from Open VSX** (works out of the box in **Cursor**,
 **Windsurf**, and other VS Code–compatible editors):
@@ -104,6 +106,7 @@ When `PINODES_ORCHESTRA_TOKEN` is set, browser clients must provide it. The VS C
 | [vscode-extension/README.md](./vscode-extension/README.md) | VS Code extension — how it works, build, settings |
 | [docs/HERMES_DESKTOP.md](./docs/HERMES_DESKTOP.md) | Hermes Desktop analysis |
 | [docs/PROGRAMMATIC_API.md](./docs/PROGRAMMATIC_API.md) | REST/CLI API for programmatic orchestration (boards, flows, auth) |
+| [docs/MULTI_INSTANCE.md](./docs/MULTI_INSTANCE.md) | Why one backend is shared today, and the path to per-workspace isolation |
 
 ## Programmatic API
 

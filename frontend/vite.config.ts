@@ -3,6 +3,8 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 
+const BACKEND_PORT = process.env.PINODES_ORCHESTRA_PORT ?? "3847";
+
 export default defineConfig({
   plugins: [
     react(),
@@ -41,8 +43,8 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      "/api": "http://localhost:3847",
-      "/ws": { target: "ws://localhost:3847", ws: true },
+      "/api": `http://localhost:${BACKEND_PORT}`,
+      "/ws": { target: `ws://localhost:${BACKEND_PORT}`, ws: true },
     },
   },
 });

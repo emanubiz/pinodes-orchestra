@@ -3,9 +3,11 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
+import { findFreePort, isPortFree } from "./port.js";
 import { resolveSessionToken } from "./sessionToken.js";
+import { workspaceInstanceDataDir } from "./workspaceDataDir.js";
 
-export type BackendStatus = "stopped" | "starting" | "running" | "external" | "error";
+export type BackendStatus = "stopped" | "starting" | "running" | "error";
 
 /** Thrown when the required `pi` CLI is not installed. The modal is shown to the
  * user at the point of detection, so callers should swallow this quietly. */
@@ -26,10 +28,13 @@ const PI_INSTALL_URL = "https://www.npmjs.com/package/@earendil-works/pi-coding-
  * better-sqlite3 in-process inside the extension host. Instead spawn the
  * existing Fastify backend (`backend/dist/index.js`) as a Node subprocess and
  * talk to it over localhost HTTP/WS, exactly like the standalone app.
+ *
+ * Each VS Code window gets its own backend on a dedicated port with an isolated
+ * SQLite directory (see docs/MULTI_INSTANCE.md).
  */
 export class BackendManager {
   private proc: ChildProcess | undefined;
-  private external = false;
+  private _port = 0;
   private _status: BackendStatus = "stopped";
   private readonly output: vscode.OutputChannel;
   private readonly onDidChangeEmitter = new vscode.EventEmitter<BackendStatus>();
@@ -62,7 +67,11 @@ export class BackendManager {
   }
 
   get port(): number {
-    return vscode.workspace.getConfiguration("pinodesOrchestra").get<number>("port", 3847);
+    return this._port || this.configuredPort || 3847;
+  }
+
+  private get configuredPort(): number {
+    return vscode.workspace.getConfiguration("pinodesOrchestra").get<number>("port", 0);
   }
 
   get baseUrl(): string {
@@ -84,27 +93,28 @@ export class BackendManager {
     this.onDidChangeEmitter.fire(status);
   }
 
-  /**
-   * Ensure a backend is reachable. If one already answers /api/health we adopt
-   * it (e.g. the user runs `npm run dev`); otherwise we spawn our own.
-   */
+  /** Ensure this window's backend subprocess is running and healthy. */
   async ensureStarted(): Promise<void> {
-    if (this._status === "running" || this._status === "external") {
-      if (await this.isHealthy()) return;
+    if (this._status === "running" && this.proc && (await this.isHealthy())) return;
+
+    if (this.configuredPort > 0) {
+      if (!(await isPortFree(this.configuredPort))) {
+        this._port = this.configuredPort;
+        if (await this.isHealthy()) {
+          this.log(
+            `Port ${this.configuredPort} is in use by another process; cannot start a dedicated backend. ` +
+              "Free the port or set pinodesOrchestra.port to 0 for automatic allocation.",
+          );
+          this.setStatus("error");
+          throw new Error(`Port ${this.configuredPort} is already in use.`);
+        }
+      }
+      this._port = this.configuredPort;
+    } else {
+      this._port = await findFreePort(3847);
     }
 
-    if (await this.isHealthy()) {
-      this.external = true;
-      this.log(`Adopted backend already running on ${this.baseUrl}`);
-      this.setStatus("external");
-      return;
-    }
-
-    // The backend spawns one `pi` process per agent node, so it's a hard
-    // prerequisite. VS Code can't gate installation on it, so we gate launch:
-    // if pi isn't on PATH we tell the user how to install it and abort.
     await this.ensurePi();
-
     await this.spawnBackend();
   }
 
@@ -158,22 +168,37 @@ export class BackendManager {
       .trim();
     if (configured) return configured;
 
-    // Self-contained packaged extension: the backend (+ frontend, prompts, prod
-    // node_modules) is bundled under `<extension>/server/` by scripts/bundle.mjs.
     const bundled = path.join(this.bundledRoot, "backend", "dist", "index.js");
     if (fs.existsSync(bundled)) return bundled;
 
-    // Dev layout: <repo>/vscode-extension/  →  <repo>/backend/dist/index.js
     return path.join(this.context.extensionPath, "..", "backend", "dist", "index.js");
   }
 
-  /** Root of the bundled server tree inside a packaged extension. */
   private get bundledRoot(): string {
     return path.join(this.context.extensionPath, "server");
   }
 
   private workspaceCwd(): string | undefined {
     return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  }
+
+  private instanceDataDir(): string {
+    const workspaceKey = this.workspaceCwd() ?? "default";
+    return workspaceInstanceDataDir(this.context.globalStorageUri.fsPath, workspaceKey);
+  }
+
+  /** Copy legacy flat globalStorage DB into the per-workspace folder once. */
+  private migrateLegacyDb(dataDir: string): void {
+    const legacyDb = path.join(this.context.globalStorageUri.fsPath, "pinodes-orchestra.db");
+    const newDb = path.join(dataDir, "pinodes-orchestra.db");
+    if (!fs.existsSync(legacyDb) || fs.existsSync(newDb)) return;
+    try {
+      fs.copyFileSync(legacyDb, newDb);
+      this.log(`Migrated legacy database to ${dataDir}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.log(`Legacy DB migration skipped: ${msg}`);
+    }
   }
 
   private async spawnBackend(): Promise<void> {
@@ -188,39 +213,27 @@ export class BackendManager {
     const nodeCmd = vscode.workspace
       .getConfiguration("pinodesOrchestra")
       .get<string>("nodeCommand", "node");
-    // Spawn the backend with a cwd that is stable across extension updates.
-    // Using the bundled entry's parent dir (the extension's `server/backend`)
-    // is wrong: that path is wiped on every update, so a previously-persisted
-    // board would send a load_graph with a cwd that no longer exists and the
-    // backend would reject it → terminals never spawn. Fall back to the user's
-    // home dir when no workspace folder is open.
     const cwd = this.workspaceCwd() ?? os.homedir();
+    const dataDir = this.instanceDataDir();
+    this.migrateLegacyDb(dataDir);
 
-    // When running the packaged backend, keep its SQLite DB in the extension's
-    // per-user global storage (the install dir is wiped on every update).
-    const bundled = entry.startsWith(this.bundledRoot);
-    const dataDir = this.context.globalStorageUri.fsPath;
     this.setStatus("starting");
     this.log(`Starting backend: ${nodeCmd} ${entry}`);
     this.log(`  cwd:  ${cwd}`);
     this.log(`  port: ${this.port}`);
-    if (bundled) this.log(`  data: ${dataDir}`);
+    this.log(`  data: ${dataDir}`);
 
     this.proc = spawn(nodeCmd, [entry], {
       cwd,
       env: {
         ...process.env,
         PORT: String(this.port),
-        // Backend watchdog: exit if this extension host dies (see backend/src/index.ts).
         PINODES_ORCHESTRA_PARENT_PID: String(process.pid),
-        // Packaged: persist the DB outside the (volatile) extension install dir.
-        ...(bundled ? { PINODES_ORCHESTRA_DATA_DIR: dataDir } : {}),
+        PINODES_ORCHESTRA_DATA_DIR: dataDir,
         PINODES_ORCHESTRA_TOKEN: this.sessionToken,
       },
     });
-    this.external = false;
 
-    // Safety net for a clean extension-host exit: kill the child synchronously.
     const pid = this.proc.pid;
     const killOnExit = () => {
       try {
@@ -249,11 +262,6 @@ export class BackendManager {
   }
 
   private async waitForHealth(timeoutMs = 60_000): Promise<void> {
-    // 60s (was 20s): on Windows the first backend boot can take ~20-30s because
-    // Windows Defender scans the native modules (node-pty, better-sqlite3) on
-    // first load. 20s was too tight — the server would come up just after the
-    // timeout expired, so the panel failed on first open and only worked after
-    // a manual retry (by which point the backend was already running).
     const deadline = Date.now() + timeoutMs;
     let attempt = 0;
     while (Date.now() < deadline) {
@@ -293,12 +301,6 @@ export class BackendManager {
   }
 
   async stop(): Promise<void> {
-    if (this.external) {
-      this.log("Backend is externally owned; not stopping it.");
-      this.external = false;
-      this.setStatus("stopped");
-      return;
-    }
     const proc = this.proc;
     if (!proc) {
       this.setStatus("stopped");
@@ -309,7 +311,6 @@ export class BackendManager {
       const onExit = () => resolve();
       proc.once("exit", onExit);
       proc.kill();
-      // Hard kill if it lingers.
       setTimeout(() => {
         if (this.proc === proc) proc.kill("SIGKILL");
         resolve();

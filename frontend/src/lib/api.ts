@@ -4,23 +4,42 @@
  *  - Production (served by backend on :3847): empty → same origin
  *  - Custom host: set VITE_API_BASE at build time or window.__PINODES_ORCHESTRA_API__
  */
-function resolveBase(): string {
+/**
+ * Resolve backend base URL from location and runtime flags.
+ * @internal Exported for unit tests.
+ */
+export function resolveBaseForLocation(
+  loc: { protocol: string; hostname: string; port: string },
+  options: {
+    dev?: boolean;
+    runtimeApi?: string;
+    envBase?: string;
+  } = {},
+): string {
+  if (options.runtimeApi?.trim()) return options.runtimeApi.trim().replace(/\/$/, "");
+  if (options.envBase?.trim()) return options.envBase.trim().replace(/\/$/, "");
+  if (options.dev) return "";
+
+  const { protocol, hostname, port } = loc;
+  if (protocol.startsWith("http") && port) return "";
+
+  return `http://${hostname || "localhost"}:3847`;
+}
+
+/** @internal Exported for unit tests. */
+export function resolveBase(): string {
   if (typeof window === "undefined") {
     return process.env.VITE_API_BASE ?? "http://localhost:3847";
   }
 
   const runtime = (window as { __PINODES_ORCHESTRA_API__?: string }).__PINODES_ORCHESTRA_API__;
-  if (runtime) return runtime.replace(/\/$/, "");
-
   const envBase = import.meta.env.VITE_API_BASE as string | undefined;
-  if (envBase) return envBase.replace(/\/$/, "");
 
-  if (import.meta.env.DEV) return "";
-
-  const { protocol, port } = window.location;
-  if (protocol.startsWith("http") && port === "3847") return "";
-
-  return "http://localhost:3847";
+  return resolveBaseForLocation(window.location, {
+    dev: import.meta.env.DEV,
+    runtimeApi: runtime,
+    envBase,
+  });
 }
 
 export const API_BASE = resolveBase();

@@ -114,7 +114,7 @@ VSCode Workbench
 |-----------|----------|--------|
 | UI | `createWebviewPanel` framing the backend-served UI in an iframe via `vscode.env.asExternalUri` | ✅ |
 | Transport | localhost HTTP/WS — frontend talks to the backend origin directly inside the iframe | ✅ |
-| Backend | spawned as a Node subprocess from bundled `server/`; adopts an already-running one | ✅ |
+| Backend | spawned as a Node subprocess from bundled `server/`; **one per window** on its own free port + isolated SQLite dir (see [MULTI_INSTANCE.md](./MULTI_INSTANCE.md)) | ✅ |
 | cwd | `workspaceFolders[0]` passed as `?embed=vscode&cwd=…`; frontend binds the single board and hides the repo-tab switcher | ✅ |
 | Service worker | not registered in embedded mode (avoids stale-shell caching in the webview) | ✅ |
 | Native addons | no in-process `node-pty`/`better-sqlite3` — all in the subprocess | ✅ |
@@ -125,7 +125,8 @@ The embedded-mode contract lives in `frontend/src/lib/embed.ts` (reads `embed`/`
 **Still open:**
 
 - Multi-root workspace handling (currently binds to the first folder).
-- Configurable port (the standalone frontend resolves its API same-origin only on `3847`).
+- Cross-workspace discovery (a window seeing another workspace's boards) — by
+  design each window is isolated; a global instance registry is a possible follow-up.
 
 **Publish:** ✅ [Open VSX](https://open-vsx.org/extension/emanubiz/pinodes-orchestra-vscode)
 (Cursor, Windsurf, …) + VS Code Marketplace (same extension ID).

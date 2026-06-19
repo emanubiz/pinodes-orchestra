@@ -117,8 +117,11 @@ pinodes-orchestra/
 ├── README.md
 ├── docs/
 │   ├── EXTENSIONS_ROADMAP.md
+│   ├── EXTENSION_PUBLISHING.md
 │   ├── HERMES_DESKTOP.md
-│   └── PROGRAMMATIC_API.md
+│   ├── MULTI_INSTANCE.md    # per-window backend isolation (VS Code)
+│   ├── PROGRAMMATIC_API.md
+│   └── SECURITY.md
 ├── prompts/                 # seed builtin markdown (9 roles)
 ├── backend/
 │   ├── pi-extensions/
@@ -143,7 +146,8 @@ pinodes-orchestra/
 │       └── lib/             # api, ptyBus, termTheme, termFit, embed (host-embed flags)
 └── vscode-extension/        # VS Code host: spawns the backend, frames the UI in a webview
     └── src/                 # extension, backend (subprocess mgr), panel (webview), controlView
-                             # sessionToken.ts (ephemeral auto-token), sessionToken.test.ts
+                             # sessionToken.ts (ephemeral auto-token), port.ts (free-port
+                             # allocation), workspaceDataDir.ts (per-workspace SQLite dir)
 ```
 
 ## WebSocket protocol
@@ -225,6 +229,8 @@ Each board tab = one `cwd` + workflow snapshot + isolated `boardId:nodeId` PTY s
 - **Stop board** aborts only the active board's nodes
 
 When **embedded in a host** (VS Code) the iframe URL carries `?embed=vscode&cwd=…`: the frontend collapses to a single board bound to the host workspace folder (`boardStore.bindWorkspace`) and hides the repo-tab sidebar — the host already owns the "current project". See `frontend/src/lib/embed.ts` and [docs/EXTENSIONS_ROADMAP.md](./docs/EXTENSIONS_ROADMAP.md).
+
+Each VS Code window spawns its **own** backend on a dedicated port (first free port from `3847`) with a per-workspace SQLite directory, so multiple windows never share state or a port. The standalone backend is unchanged (single process, `PORT` default `3847`); the per-window isolation lives entirely in the extension via env vars (`PORT`, `PINODES_ORCHESTRA_DATA_DIR`, `PINODES_ORCHESTRA_TOKEN`). See [docs/MULTI_INSTANCE.md](./docs/MULTI_INSTANCE.md).
 
 ## Views
 

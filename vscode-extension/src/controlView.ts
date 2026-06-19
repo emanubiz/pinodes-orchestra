@@ -43,14 +43,12 @@ function html(status: BackendStatus, port: number): string {
     stopped: "Stopped",
     starting: "Starting…",
     running: "Running",
-    external: "Running (external)",
     error: "Error",
   };
   const color: Record<BackendStatus, string> = {
     stopped: "#71717a",
     starting: "#fbbf24",
     running: "#34d399",
-    external: "#38bdf8",
     error: "#f87171",
   };
   return /* html */ `<!DOCTYPE html>
