@@ -3,13 +3,22 @@ import { useRuntimeStore } from "../stores/runtimeStore";
 import { emitNodeReady, emitPtyExit, emitPtyOutput, emitPtySize } from "../lib/ptyBus";
 import { normalizeColumn, useKanbanStore } from "../stores/kanbanStore";
 import { wsUrl } from "../lib/api";
+import { useTimelineCapture } from "./useTimelineCapture";
 
-export function useOrchestraWs(activeBoardId: string) {
+export function useOrchestraWs(
+  activeBoardId: string,
+  _edges: Array<{ source: string; target: string }>,
+  nodeLabels: Record<string, string>,
+) {
   const wsRef = useRef<WebSocket | null>(null);
   const boardRef = useRef(activeBoardId);
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const unmountedRef = useRef(false);
   boardRef.current = activeBoardId;
+
+  const captureMessage = useTimelineCapture(activeBoardId, nodeLabels);
+  const captureRef = useRef(captureMessage);
+  captureRef.current = captureMessage;
 
   const {
     setConnected,
@@ -54,6 +63,8 @@ export function useOrchestraWs(activeBoardId: string) {
           msg.type !== "card_status"
         )
           return;
+
+        captureRef.current(msg);
 
         switch (msg.type) {
           case "connected":

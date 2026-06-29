@@ -540,6 +540,19 @@ export class PtyHub {
 
     this.scheduleInject(boardId, target.id, message);
 
+    // Emit the canonical handoff signal so the UI (timeline) records a real
+    // handoff event instead of guessing from `node_status: running` timestamps.
+    // This is the single source of truth for "agent A handed off to agent B":
+    // it fires exactly once per successful deliverCall, with the real
+    // from/to node ids — no temporal heuristic, no false positives on manual
+    // starts, no missed handoffs when the upstream agent worked for >8s.
+    this.broadcast({
+      type: "handoff",
+      boardId,
+      fromNodeId,
+      toNodeId: target.id,
+    });
+
     // The sender just handed off successfully, so clear any stale "handoff
     // failed" error on its card (it is alive and running).
     if (this.sessions.has(key(boardId, fromNodeId))) {

@@ -2,6 +2,57 @@
 
 All notable changes to the **PiNodes Orchestra** extension are documented here.
 
+## 0.2.18
+
+### Added
+
+- **Timeline panel (right sidebar).** A new collapsible "Handoff log" tab in the side
+  panel chronologically logs handoffs and errors for the active board. Handoffs come
+  from a canonical `handoff` WebSocket event broadcast by `PtyHub.deliverCall` — the
+  single source of truth that already knows the real `fromNodeId` / `toNodeId` of
+  every agent-to-agent hand-off. One event per successful delivery, no temporal
+  window, no edge inference, no false positives, no missed handoffs. (`done` /
+  `inject` / `turn_end` entries are intentionally not produced — the backend emits no
+  completion or inject signal yet; reserved event types exist client-side for them,
+  see roadmap.)
+  - `PtyHub.deliverCall`: broadcasts `{ type: "handoff", boardId, fromNodeId,
+    toNodeId }` right after `scheduleInject` succeeds (and only on the success
+    path — a failed recipient resolution emits nothing).
+  - `timelineStore.ts`: Zustand store, FIFO-capped at 200 entries per board with a
+    stable empty-array reference (avoids the `useSyncExternalStore` infinite-loop
+    crash on empty/cleared boards).
+  - `useTimelineCapture.ts`: React hook that consumes `handoff` events directly and
+    lifts `node_status: error` verbatim. `node_status: running` produces no timeline
+    entry.
+  - `TimelinePanel.tsx`: React component with auto-scroll, scroll-to-bottom floating
+    button, click-to-select-node, and tab integration in `App.tsx`.
+  - Tests: `PtyHub.test.ts` covers the success broadcast and the no-broadcast on
+    invalid recipient; `useTimelineCapture.test.ts` covers the canonical event,
+    a regression for the old >8s miss, and the absence of running-based inference.
+- **5 new built-in system prompts.** The prompt library grows from 9 to 14 roles:
+  - **Backend Developer** — API design, DB, auth, middleware, server testing.
+  - **Frontend Developer** — UI components, state, styling, a11y, performance.
+  - **Architectural Reviewer** — Architecture review, ADRs, risk register, trade-offs.
+  - **Design Reviewer** — Visual/UX audit, usability heuristics, accessibility checks.
+  - **Security Reviewer** — Threat modelling (STRIDE), OWASP Top 10, dependency
+    scanning, hardening.
+- **Auditor prompt overhaul.** Completely rewritten from 56 to 158 lines with a
+  structured 7-phase audit methodology: context → architecture → security → error
+  handling → testing → performance → code quality. Output is graded by severity
+  (🔴🟠🟡🟢) with executive summary, metrics dashboard, and actionable action plan.
+
+### Changed
+
+- **DB seed now loads 14 builtins** (was 9). UPSERT on first backend start — existing
+  databases auto-add the 5 new roles without migration.
+- **ARCHITECTURE.md** updated: tree now reflects `TimelinePanel`, `timelineStore`,
+  `useTimelineCapture`; 14 prompts in seed; "handoff log / timeline panel" removed
+  from future-scope list.
+- **README.md** updated: usage steps mention 14 built-in roles and Timeline tab; new
+  "Built-in Prompt Library" table documents all 14 roles with descriptions.
+- **vscode-extension/README.md** updated: "How it works" section documents the
+  Timeline panel feature.
+
 ## 0.2.17
 
 ### Fixed

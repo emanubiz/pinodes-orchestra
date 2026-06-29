@@ -76,3 +76,16 @@ export interface SavedWorkflowListItem {
   name: string;
   updated_at: string;
 }
+
+export type TimelineEventType = "handoff" | "error";
+
+export interface TimelineEntry {
+  id: string;
+  boardId: string;
+  ts: number;
+  type: TimelineEventType;
+  nodeId: string;
+  fromNodeId?: string;
+  toNodeId?: string;
+  summary: string;
+}

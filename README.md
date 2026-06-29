@@ -74,9 +74,9 @@ Details: [`vscode-extension/README.md`](./vscode-extension/README.md),
 ## Usage
 
 1. **Left tabs**: one board per repo folder; **+** to open another path
-2. Click a prompt in the library → adds a node to the active board
+2. Click a prompt in the library → adds a node to the active board (14 built-in roles available)
 3. Drag connections between nodes (defines hand-off permissions)
-4. Select a node → interactive terminal in side panel
+4. Select a node → interactive terminal in side panel; **Timeline** tab shows handoff/event chronology
 5. Agents hand off via `@@HANDOFF` blocks (see [ARCHITECTURE.md](./ARCHITECTURE.md))
 6. **Save** / **Load…** for workflows (stored with cwd + entry node)
 7. **Kanban** view: launch tasks into entry nodes
@@ -107,6 +107,29 @@ When `PINODES_ORCHESTRA_TOKEN` is set, browser clients must provide it. The VS C
 | [docs/HERMES_DESKTOP.md](./docs/HERMES_DESKTOP.md) | Hermes Desktop analysis |
 | [docs/PROGRAMMATIC_API.md](./docs/PROGRAMMATIC_API.md) | REST/CLI API for programmatic orchestration (boards, flows, auth) |
 | [docs/MULTI_INSTANCE.md](./docs/MULTI_INSTANCE.md) | Why one backend is shared today, and the path to per-workspace isolation |
+
+## Built-in Prompt Library
+
+The project ships 14 built-in system prompts (`prompts/*.md`), seeded into SQLite on first start:
+
+| ID | Role | Focus |
+|----|------|-------|
+| `builtin-pm` | Project Manager | Process, planning, coordination |
+| `builtin-po` | Product Owner | User stories, value, priorities, acceptance criteria |
+| `builtin-architect` | Architect | High-level architecture, ADRs, trade-off analysis, design docs |
+| `builtin-arch-reviewer` | Architectural Reviewer | Review architecture designs, ADRs, risk register |
+| `builtin-ux` | UX/UI Designer | User flows, consistency, accessibility, states |
+| `builtin-design-reviewer` | Design Reviewer | Visual audit, usability heuristics, a11y check |
+| `builtin-developer` | Developer | General implementation, code quality, testing |
+| `builtin-backend` | Backend Developer | API design, DB, auth, middleware, server operations |
+| `builtin-frontend` | Frontend Developer | UI components, state management, styling, a11y |
+| `builtin-devops` | DevOps | CI/CD, infra, monitoring, deployment |
+| `builtin-qa` | QA Engineer | Test plans, automation, regression, quality gates |
+| `builtin-auditor` | Auditor | 360° codebase audit: architecture, security, performance, debt |
+| `builtin-security-reviewer` | Security Reviewer | Threat modelling, OWASP, dependency scanning, hardening |
+| `builtin-writer` | Technical Writer | READMEs, API docs, changelogs, guides |
+
+Users can create custom prompts via the UI or the REST API; custom prompts coexist with built-ins.
 
 ## Programmatic API
 

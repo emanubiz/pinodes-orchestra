@@ -22,7 +22,10 @@ export function TerminalPanel({ boardId, send }: TerminalPanelProps) {
     selectedNodeId ? s.nodeStatus[`${boardId}:${selectedNodeId}`] : undefined,
   );
   const [restarting, setRestarting] = usePiRestartState(boardId, selectedNodeId);
+  const overlayNodeId = useRuntimeStore((s) => s.overlayNodeId);
   const hostRef = useRef<HTMLDivElement | null>(null);
+  const termRef = useRef<Terminal | null>(null);
+  const fitRef = useRef<FitAddon | null>(null);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -43,6 +46,8 @@ export function TerminalPanel({ boardId, send }: TerminalPanelProps) {
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(host);
+    termRef.current = term;
+    fitRef.current = fit;
 
     const unsubOut = onPtyOutput(key, (data, replay) => {
       if (replay) term.reset();
@@ -55,9 +60,11 @@ export function TerminalPanel({ boardId, send }: TerminalPanelProps) {
     const onData = term.onData((data) => send({ type: "pty_input", nodeId: selectedNodeId, data }));
     const detachClipboard = attachClipboard(term, host);
 
-    // Attach immediately with a safe default size so the backend PTY is never
-    // spawned at 1 column while the sidebar is still being laid out.
-    send({ type: "attach_node", nodeId: selectedNodeId, cols: 80, rows: 24 });
+    // Attach immediately with a safe default size so a brand-new PTY is never
+    // spawned at 1 column while the sidebar is still being laid out. resize:false
+    // so we don't bounce an already-running PTY to this placeholder width — the
+    // real width is set by the fit below (and reclaimed when the overlay closes).
+    send({ type: "attach_node", nodeId: selectedNodeId, cols: 80, rows: 24, resize: false });
 
     const unsubscribeFit = fitWhenReady(
       term,
@@ -77,8 +84,36 @@ export function TerminalPanel({ boardId, send }: TerminalPanelProps) {
       unsubOut();
       unsubExit();
       term.dispose();
+      termRef.current = null;
+      fitRef.current = null;
     };
   }, [boardId, selectedNodeId, send]);
+
+  // The side panel and the full-screen overlay share ONE pi PTY. While the
+  // overlay is open it sizes that PTY to its own (much wider) width. When the
+  // overlay closes, this panel stays mounted — its host width never changed, so
+  // the fit ResizeObserver never fires — and the PTY is left at the overlay's
+  // width. pi then keeps drawing at that width while the panel renders far
+  // fewer columns, so the input line wraps on every keystroke (the staircase).
+  // Reclaim the PTY at the panel's real width whenever the overlay is not
+  // showing this node.
+  useEffect(() => {
+    if (!selectedNodeId || overlayNodeId === selectedNodeId) return;
+    const term = termRef.current;
+    const fit = fitRef.current;
+    if (!term || !fit) return;
+    const id = requestAnimationFrame(() => {
+      try {
+        fit.fit();
+      } catch {
+        return;
+      }
+      if (term.cols > 0 && term.rows > 0) {
+        send({ type: "pty_resize", nodeId: selectedNodeId, cols: term.cols, rows: term.rows });
+      }
+    });
+    return () => cancelAnimationFrame(id);
+  }, [overlayNodeId, selectedNodeId, send]);
 
   if (!selectedNodeId) {
     return (

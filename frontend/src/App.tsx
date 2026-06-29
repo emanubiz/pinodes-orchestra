@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Columns3, Network, PanelRight, Save, Square } from "lucide-react";
 import type { Node, Edge } from "@xyflow/react";
 import { BoardTabs } from "./components/BoardTabs";
@@ -9,6 +9,7 @@ import { KanbanBoard } from "./components/KanbanBoard";
 import { PromptLibrary } from "./components/PromptLibrary";
 import { WorkflowPicker } from "./components/WorkflowPicker";
 import { NodeInspector } from "./components/NodeInspector";
+import { TimelinePanel } from "./components/TimelinePanel";
 import { SystemPromptModal } from "./components/SystemPromptModal";
 import { useOrchestraWs } from "./hooks/useOrchestraWs";
 import { useBoardStore } from "./stores/boardStore";
@@ -24,6 +25,7 @@ export function App() {
   const setOverlayNodeId = useRuntimeStore((s) => s.setOverlayNodeId);
   const [promptEditNodeId, setPromptEditNodeId] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [rightTab, setRightTab] = useState<"terminal" | "timeline" | "inspector">("terminal");
   const [view, setView] = useState<"agents" | "kanban">("agents");
 
   const boards = useBoardStore((s) => s.boards);
@@ -44,7 +46,24 @@ export function App() {
   const setDefaultCwd = useBoardStore((s) => s.setDefaultCwd);
   const bindWorkspace = useBoardStore((s) => s.bindWorkspace);
 
-  const { send } = useOrchestraWs(activeBoard.id);
+  const boardEdges = useMemo(
+    () =>
+      activeBoard.snapshot.edges.map((e) => ({
+        source: e.source,
+        target: e.target,
+      })),
+    [activeBoard.snapshot.edges],
+  );
+
+  const boardNodeLabels = useMemo(() => {
+    const labels: Record<string, string> = {};
+    for (const n of activeBoard.snapshot.nodes) {
+      labels[n.id] = n.data.label;
+    }
+    return labels;
+  }, [activeBoard.snapshot.nodes]);
+
+  const { send } = useOrchestraWs(activeBoard.id, boardEdges, boardNodeLabels);
   const connected = useRuntimeStore((s) => s.connected);
   const prompts = useRuntimeStore((s) => s.prompts);
   const setPrompts = useRuntimeStore((s) => s.setPrompts);
@@ -389,29 +408,62 @@ export function App() {
 
             {panelOpen && (
             <div className="w-[360px] shrink-0 flex flex-col border-l border-white/5 min-h-0">
-              <div className="flex-1 min-h-0">
-                <TerminalPanel boardId={activeBoard.id} send={send} />
+              <div className="flex border-b border-zinc-800 shrink-0">
+                {(
+                  [
+                    { id: "terminal" as const, label: "Terminal" },
+                    { id: "timeline" as const, label: "Timeline" },
+                    { id: "inspector" as const, label: "Inspector" },
+                  ] as const
+                ).map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setRightTab(tab.id)}
+                    className={`flex-1 py-1.5 text-[11px] font-medium transition-colors ${
+                      rightTab === tab.id
+                        ? "border-b border-zinc-400 text-zinc-200"
+                        : "text-zinc-500 hover:text-zinc-300"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
               </div>
-              <NodeInspector
-                boardId={activeBoard.id}
-                entryNodeId={activeBoard.entryNodeId}
-                onSetEntry={(nodeId) => {
-                  updateActiveBoard({ entryNodeId: nodeId });
-                  const nodes = flowRef.current?.getNodes() ?? [];
-                  nodes.forEach((n) => {
-                    flowRef.current?.updateNodeData(n.id, { isEntry: n.id === nodeId });
-                  });
-                  scheduleSync(flowRef.current?.getNodes() ?? [], flowRef.current?.getEdges() ?? []);
-                }}
-                onUpdateNode={(nodeId, patch) => {
-                  flowRef.current?.updateNodeData(nodeId, patch);
-                  scheduleSync(flowRef.current?.getNodes() ?? [], flowRef.current?.getEdges() ?? []);
-                }}
-                onRunFromHere={runFromHere}
-                getSelectedNode={() =>
-                  flowRef.current?.getNode(useRuntimeStore.getState().selectedNodeId ?? "")
-                }
-              />
+
+              <div className="flex-1 min-h-0 flex flex-col">
+                {rightTab === "terminal" && (
+                  <TerminalPanel boardId={activeBoard.id} send={send} />
+                )}
+                {rightTab === "timeline" && (
+                  <TimelinePanel
+                    boardId={activeBoard.id}
+                    onSelectNode={(nodeId) => useRuntimeStore.getState().setSelectedNodeId(nodeId)}
+                  />
+                )}
+                {rightTab === "inspector" && (
+                  <NodeInspector
+                    boardId={activeBoard.id}
+                    entryNodeId={activeBoard.entryNodeId}
+                    onSetEntry={(nodeId) => {
+                      updateActiveBoard({ entryNodeId: nodeId });
+                      const nodes = flowRef.current?.getNodes() ?? [];
+                      nodes.forEach((n) => {
+                        flowRef.current?.updateNodeData(n.id, { isEntry: n.id === nodeId });
+                      });
+                      scheduleSync(flowRef.current?.getNodes() ?? [], flowRef.current?.getEdges() ?? []);
+                    }}
+                    onUpdateNode={(nodeId, patch) => {
+                      flowRef.current?.updateNodeData(nodeId, patch);
+                      scheduleSync(flowRef.current?.getNodes() ?? [], flowRef.current?.getEdges() ?? []);
+                    }}
+                    onRunFromHere={runFromHere}
+                    getSelectedNode={() =>
+                      flowRef.current?.getNode(useRuntimeStore.getState().selectedNodeId ?? "")
+                    }
+                  />
+                )}
+              </div>
             </div>
             )}
           </div>

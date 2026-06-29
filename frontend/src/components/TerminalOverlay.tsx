@@ -53,9 +53,10 @@ export function TerminalOverlay({ boardId, nodeId, label, send, onClose }: Termi
     const onData = term.onData((data) => send({ type: "pty_input", nodeId, data }));
     const detachClipboard = attachClipboard(term, host);
 
-    // Attach immediately with a safe default size; resize once the overlay is
-    // laid out so the PTY is never at 1 column.
-    send({ type: "attach_node", nodeId, cols: 80, rows: 24 });
+    // Attach with a safe default size for the spawn case; resize:false so we
+    // don't bounce an already-running PTY to this placeholder width. The fit
+    // below sets the overlay's real (full-screen) width.
+    send({ type: "attach_node", nodeId, cols: 80, rows: 24, resize: false });
 
     const unsubscribeFit = fitWhenReady(term, fit, host, (cols, rows) => {
       send({ type: "pty_resize", nodeId, cols, rows });

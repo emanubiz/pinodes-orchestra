@@ -207,4 +207,38 @@ describe("PtyHub", () => {
     vi.advanceTimersByTime(250);
     expect(inst.writes.join("")).toContain("after restart");
   });
+
+  // ── deliverCall emits the canonical handoff event ────────────────────────────
+
+  it("deliverCall broadcasts a `handoff` event with the real from/to node ids", () => {
+    const broadcasts: Array<Record<string, unknown>> = [];
+    hub.setBroadcast((msg) => broadcasts.push(msg));
+    hub.setGraph(BOARD, graphOf({ edges: true }), "/tmp");
+    hub.ensure(BOARD, "n1", 80, 24);
+    hub.ensure(BOARD, "n2", 80, 24);
+
+    const res = hub.deliverCall(BOARD, "n1", "developer", "do the thing");
+
+    expect(res.ok).toBe(true);
+    const handoffs = broadcasts.filter((m) => m.type === "handoff");
+    expect(handoffs).toHaveLength(1);
+    expect(handoffs[0]).toMatchObject({
+      boardId: BOARD,
+      fromNodeId: "n1",
+      toNodeId: "n2",
+    });
+  });
+
+  it("deliverCall does NOT broadcast a handoff when the recipient is invalid", () => {
+    const broadcasts: Array<Record<string, unknown>> = [];
+    hub.setBroadcast((msg) => broadcasts.push(msg));
+    // No outgoing edges from n1 → the recipient can't be resolved at all.
+    hub.setGraph(BOARD, graphOf({ edges: false }), "/tmp");
+    hub.ensure(BOARD, "n1", 80, 24);
+
+    const res = hub.deliverCall(BOARD, "n1", "nonexistent", "do the thing");
+
+    expect(res.ok).toBe(false);
+    expect(broadcasts.filter((m) => m.type === "handoff")).toHaveLength(0);
+  });
 });

@@ -46,6 +46,11 @@ VS Code
   [docs/MULTI_INSTANCE.md](../docs/MULTI_INSTANCE.md). (Earlier versions adopted an
   already-running backend on `3847`; that caused the second window to fail auth and
   is no longer done.)
+- **Timeline panel.** The right-side tab bar now includes a **Timeline** ("Handoff
+  log") view that chronologically logs handoffs and errors for the active board.
+  Handoffs come from a canonical `handoff` WebSocket event broadcast by
+  `PtyHub.deliverCall` (the single source of truth for every agent-to-agent
+  hand-off); errors are lifted from `node_status` events.
 
 ## Requirements
 

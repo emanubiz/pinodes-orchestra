@@ -72,9 +72,14 @@ function seedPrompts(): void {
     { id: "builtin-architect", name: "Architect", file: "architect.md" },
     { id: "builtin-ux", name: "UX/UI Designer", file: "ux-designer.md" },
     { id: "builtin-developer", name: "Developer", file: "developer.md" },
+    { id: "builtin-backend", name: "Backend Developer", file: "backend-developer.md" },
+    { id: "builtin-frontend", name: "Frontend Developer", file: "frontend-developer.md" },
     { id: "builtin-devops", name: "DevOps", file: "devops.md" },
     { id: "builtin-qa", name: "QA Engineer", file: "qa.md" },
     { id: "builtin-auditor", name: "Auditor", file: "auditor.md" },
+    { id: "builtin-arch-reviewer", name: "Architectural Reviewer", file: "architectural-reviewer.md" },
+    { id: "builtin-design-reviewer", name: "Design Reviewer", file: "design-reviewer.md" },
+    { id: "builtin-security-reviewer", name: "Security Reviewer", file: "security-reviewer.md" },
     { id: "builtin-writer", name: "Technical Writer", file: "tech-writer.md" },
   ];
 

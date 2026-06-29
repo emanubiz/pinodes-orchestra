@@ -122,7 +122,7 @@ pinodes-orchestra/
 │   ├── MULTI_INSTANCE.md    # per-window backend isolation (VS Code)
 │   ├── PROGRAMMATIC_API.md
 │   └── SECURITY.md
-├── prompts/                 # seed builtin markdown (9 roles)
+├── prompts/                 # seed builtin markdown (14 roles)
 ├── backend/
 │   ├── pi-extensions/
 │   │   └── call-agent.ts    # @@HANDOFF / @@CARD parser
@@ -138,11 +138,11 @@ pinodes-orchestra/
 │       └── types.ts
 ├── frontend/
 │   └── src/
-│       ├── components/      # FlowCanvas, AgentNode, TerminalPanel, TerminalOverlay,
+│       ├── components/      # FlowCanvas, AgentNode, TimelinePanel, TerminalPanel, TerminalOverlay,
 │       │                    # KanbanBoard, PromptLibrary, WorkflowPicker, NodeInspector,
 │       │                    # SystemPromptModal, BoardTabs
-│       ├── stores/          # boardStore, runtimeStore, kanbanStore (zustand)
-│       ├── hooks/           # useOrchestraWs, usePiRestartState
+│       ├── stores/          # boardStore, runtimeStore, kanbanStore, timelineStore (zustand)
+│       ├── hooks/           # useOrchestraWs, usePiRestartState, useTimelineCapture
 │       └── lib/             # api, ptyBus, termTheme, termFit, embed (host-embed flags)
 └── vscode-extension/        # VS Code host: spawns the backend, frames the UI in a webview
     └── src/                 # extension, backend (subprocess mgr), panel (webview), controlView
@@ -158,15 +158,16 @@ pinodes-orchestra/
 |-------|---------|
 | `connected` | handshake |
 | `node_status` | `{ boardId, nodeId, status, message? }` |
+| `handoff` | `{ boardId, fromNodeId, toNodeId }` — canonical agent-to-agent hand-off signal, broadcast by `PtyHub.deliverCall` on every successful delivery. The timeline records handoffs from this event (no client-side inference). Fires exactly once per successful hand-off, never on a failed recipient resolution |
 | `pty_output` | `{ boardId, nodeId, data, replay?, cols?, rows? }` |
 | `pty_size` | `{ boardId, nodeId, cols, rows }` — PTY geometry broadcast (read-only mirrors use this to scale) |
 | `pty_exit` | `{ boardId, nodeId, code }` |
 | `node_ready` | `{ boardId, nodeId }` — pi has booted (reported `session_start`); clients clear the "starting pi…" overlay. Also sent to a late-attaching client if the node is already ready |
 | `card_status` | `{ boardId, column }` |
 | `enforcement` | `{ boardId, nodeId, enabled }` — per-node determinism-watchdog state (UI toggle sync) |
-| `stream` | `{ boardId, nodeId, kind, text }` — structured streaming (relayed from pi agent): `text`, `thinking`, `tool_start`, `tool_end` |
-| `message_in` | `{ boardId, nodeId, source, text }` — completed message (relayed from pi agent) |
-| `turn_end` | `{ boardId, nodeId }` — agent turn finished (relayed from pi agent); frontend flushes stream buffer |
+| `stream` | _Reserved — not currently emitted._ `{ boardId, nodeId, kind, text }` — structured streaming (`text`, `thinking`, `tool_start`, `tool_end`). Client handler exists; the backend has no pi-agent relay yet (planned 0.2.19) |
+| `message_in` | _Reserved — not currently emitted._ `{ boardId, nodeId, source, text }` — completed message. Client handler exists; no backend relay yet (planned 0.2.19) |
+| `turn_end` | _Reserved — not currently emitted._ `{ boardId, nodeId }` — agent turn finished; frontend would flush the stream buffer. Client handler exists; no backend relay yet (planned 0.2.19) |
 | `error` | `{ message, boardId?, nodeId? }` |
 
 ### Client → server
@@ -270,5 +271,4 @@ Boards (cwd, label, graph snapshot) are persisted in the `boards` SQLite table. 
 - Run history / analytics
 - Multi-user / RBAC
 - Edge conditions / labels (`@@HANDOFF:<handle> IF <condition>` guards)
-- Handoff log / timeline panel (a view of the from→to handoff stream; `handoff-failed` would surface here too)
 - CLI `--json` flag (machine-readable output; the CLI prints human-friendly text today)
