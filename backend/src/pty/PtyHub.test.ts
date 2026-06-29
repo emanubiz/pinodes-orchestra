@@ -7,6 +7,7 @@ interface FakePty {
   sessionId: string;
   writes: string[];
   _exit: ((e: { exitCode: number }) => void) | null;
+  _data: ((d: string) => void) | null;
   onData: (cb: (d: string) => void) => void;
   onExit: (cb: (e: { exitCode: number }) => void) => void;
   write: (d: string) => void;
@@ -27,7 +28,10 @@ vi.mock("node-pty", () => ({
         sessionId: sidIdx >= 0 ? args[sidIdx + 1] : "",
         writes: [],
         _exit: null,
-        onData() {},
+        _data: null,
+        onData(cb) {
+          this._data = cb;
+        },
         onExit(cb) {
           this._exit = cb;
         },
@@ -65,6 +69,36 @@ function graphOf(opts: { edges: boolean; n1Final?: boolean }): WorkflowGraph {
     ],
     edges: opts.edges ? [{ id: "e1", sourceNodeId: "n1", targetNodeId: "n2" }] : [],
   };
+}
+
+
+function graphWithDuplicateDevelopers(): WorkflowGraph {
+  return {
+    name: "Duplicates",
+    cwd: "/tmp",
+    entryNodeId: "n1",
+    nodes: [
+      { id: "n1", label: "Architect", promptId: "p1", position: { x: 0, y: 0 } },
+      { id: "dev-a", label: "Developer", promptId: "p2", position: { x: 1, y: 0 } },
+      { id: "dev-b", label: "Developer", promptId: "p2", position: { x: 2, y: 0 } },
+      { id: "qa", label: "Quality Analyst", promptId: "p2", position: { x: 3, y: 0 } },
+    ],
+    edges: [
+      { id: "e1", sourceNodeId: "n1", targetNodeId: "dev-a" },
+      { id: "e2", sourceNodeId: "n1", targetNodeId: "dev-b" },
+      { id: "e3", sourceNodeId: "n1", targetNodeId: "qa" },
+    ],
+  };
+}
+
+function emitData(inst: FakePty, data: string): void {
+  expect(inst._data).toBeTypeOf("function");
+  inst._data?.(data);
+}
+
+function emitExit(inst: FakePty, exitCode: number): void {
+  expect(inst._exit).toBeTypeOf("function");
+  inst._exit?.({ exitCode });
 }
 
 /** Last pty spawned for a node (sessionId is `${board}-${node}` sanitized). */
@@ -141,6 +175,36 @@ describe("PtyHub", () => {
     );
   });
 
+
+
+  it("spawns with the expected command, cwd, size, env and startup broadcasts", () => {
+    const broadcasts: Array<Record<string, unknown>> = [];
+    const oldToken = process.env.PINODES_ORCHESTRA_TOKEN;
+    process.env.PINODES_ORCHESTRA_TOKEN = "test-token";
+    hub.setBroadcast((msg) => broadcasts.push(msg));
+
+    try {
+      hub.setGraph(BOARD, graphOf({ edges: true }), "/tmp");
+      hub.ensure(BOARD, "n1", 111, 33);
+    } finally {
+      if (oldToken === undefined) delete process.env.PINODES_ORCHESTRA_TOKEN;
+      else process.env.PINODES_ORCHESTRA_TOKEN = oldToken;
+    }
+
+    const call = lastSpawnFor("n1")!;
+    expect(call).toBeDefined();
+    expect(argValue(call, "--tools")).toBe("read,bash,edit,write,grep");
+    expect(argValue(call, "--session-id")).toBe("b1-n1");
+    expect(argValue(call, "--name")).toBe("Architect");
+    expect(call.opts).toMatchObject({ name: "xterm-256color", cols: 111, rows: 33, cwd: "/tmp" });
+    expect((call.opts.env as Record<string, string>).PINODES_ORCHESTRA_BOARD).toBe(BOARD);
+    expect((call.opts.env as Record<string, string>).PINODES_ORCHESTRA_NODE).toBe("n1");
+    expect((call.opts.env as Record<string, string>).PINODES_ORCHESTRA_TOKEN).toBe("test-token");
+    expect((call.opts.env as Record<string, string>).PINODES_ORCHESTRA_URL).toMatch(/^http:\/\/localhost:/);
+    expect(broadcasts).toContainEqual({ type: "node_status", boardId: BOARD, nodeId: "n1", status: "running" });
+    expect(broadcasts).toContainEqual({ type: "pty_size", boardId: BOARD, nodeId: "n1", cols: 111, rows: 33 });
+  });
+
   // ── setGraph no longer types into running terminals ──────────────────────────
 
   it("setGraph does not type any orchestration update into a running node", () => {
@@ -156,6 +220,23 @@ describe("PtyHub", () => {
   });
 
   // ── ready-gated inject ───────────────────────────────────────────────────────
+
+
+
+  it("defers a direct inject until the graph arrives, then waits for readiness", () => {
+    vi.useFakeTimers();
+    hub.injectTask(BOARD, "n2", "queued before graph");
+    expect(spawnCalls).toHaveLength(0);
+
+    hub.setGraph(BOARD, graphOf({ edges: true }), "/tmp");
+    const inst = ptyFor("n2")!;
+    expect(inst).toBeDefined();
+    expect(inst.writes.join("")).not.toContain("queued before graph");
+
+    hub.markReady(BOARD, "n2");
+    vi.advanceTimersByTime(250);
+    expect(inst.writes.join("")).toContain("[200~queued before graph[201~");
+  });
 
   it("queues an inject until the node reports ready, then flushes it", () => {
     vi.useFakeTimers();
@@ -208,6 +289,115 @@ describe("PtyHub", () => {
     expect(inst.writes.join("")).toContain("after restart");
   });
 
+
+
+  // ── PTY I/O, lifecycle and replay buffer ───────────────────────────────────
+
+  it("passes input through, resizes the owner PTY and reports current size", () => {
+    const broadcasts: Array<Record<string, unknown>> = [];
+    hub.setBroadcast((msg) => broadcasts.push(msg));
+    hub.setGraph(BOARD, graphOf({ edges: true }), "/tmp");
+    hub.ensure(BOARD, "n1", 80, 24);
+    const inst = ptyFor("n1")!;
+
+    hub.input(BOARD, "n1", "abc");
+    expect(inst.writes).toEqual(["abc"]);
+
+    hub.resize(BOARD, "n1", 120, 40);
+    expect(inst.resize).toHaveBeenCalledWith(120, 40);
+    expect(hub.size(BOARD, "n1")).toEqual({ cols: 120, rows: 40 });
+    expect(broadcasts).toContainEqual({ type: "pty_size", boardId: BOARD, nodeId: "n1", cols: 120, rows: 40 });
+  });
+
+  it("accumulates PTY output, broadcasts chunks and replays only the bounded scrollback", () => {
+    const broadcasts: Array<Record<string, unknown>> = [];
+    hub.setBroadcast((msg) => broadcasts.push(msg));
+    hub.setGraph(BOARD, graphOf({ edges: true }), "/tmp");
+    hub.ensure(BOARD, "n1", 80, 24);
+    const inst = ptyFor("n1")!;
+
+    emitData(inst, "hello");
+    expect(hub.ensure(BOARD, "n1", 0, 0, false)).toBe("hello");
+    expect(broadcasts).toContainEqual({ type: "pty_output", boardId: BOARD, nodeId: "n1", data: "hello" });
+
+    const large = "x".repeat(256_010);
+    emitData(inst, large);
+    const replay = hub.ensure(BOARD, "n1", 0, 0, false);
+    expect(replay).toHaveLength(256_000);
+    expect(replay).toBe("x".repeat(256_000));
+  });
+
+  it("kills sessions and resolves waitForExit when the active PTY exits", async () => {
+    const broadcasts: Array<Record<string, unknown>> = [];
+    hub.setBroadcast((msg) => broadcasts.push(msg));
+    hub.setGraph(BOARD, graphOf({ edges: true }), "/tmp");
+    hub.ensure(BOARD, "n1", 80, 24);
+    const inst = ptyFor("n1")!;
+
+    const wait = hub.waitForExit(BOARD, "n1", 1_000);
+    emitExit(inst, 7);
+
+    await expect(wait).resolves.toEqual({ code: 7, timedOut: false });
+    expect(hub.isNodeRunning(BOARD, "n1")).toBe(false);
+    expect(hub.isReady(BOARD, "n1")).toBe(false);
+    expect(broadcasts).toContainEqual({ type: "pty_exit", boardId: BOARD, nodeId: "n1", code: 7 });
+    expect(broadcasts).toContainEqual({ type: "node_status", boardId: BOARD, nodeId: "n1", status: "idle" });
+  });
+
+  it("waitForExit resolves immediately for missing sessions and times out for running ones", async () => {
+    await expect(hub.waitForExit(BOARD, "n1", 1_000)).resolves.toEqual({ code: null, timedOut: false });
+
+    vi.useFakeTimers();
+    hub.setGraph(BOARD, graphOf({ edges: true }), "/tmp");
+    hub.ensure(BOARD, "n1", 80, 24);
+    const wait = hub.waitForExit(BOARD, "n1", 1_000);
+    vi.advanceTimersByTime(1_000);
+    await expect(wait).resolves.toEqual({ code: null, timedOut: true });
+  });
+
+  it("kill and killBoard remove active sessions without waiting for an exit event", () => {
+    hub.setGraph(BOARD, graphOf({ edges: true }), "/tmp");
+    hub.ensure(BOARD, "n1", 80, 24);
+    hub.ensure(BOARD, "n2", 80, 24);
+    const n1 = ptyFor("n1")!;
+    const n2 = ptyFor("n2")!;
+
+    hub.kill(BOARD, "n1");
+    expect(n1.kill).toHaveBeenCalledOnce();
+    expect(hub.isNodeRunning(BOARD, "n1")).toBe(false);
+
+    hub.killBoard(BOARD);
+    expect(n2.kill).toHaveBeenCalledOnce();
+    expect(hub.isNodeRunning(BOARD, "n2")).toBe(false);
+  });
+
+  it("killBoard clears deferred spawns for that board", () => {
+    hub.ensure(BOARD, "n1", 80, 24);
+    expect(spawnCalls).toHaveLength(0);
+
+    hub.killBoard(BOARD);
+    hub.setGraph(BOARD, graphOf({ edges: true }), "/tmp");
+
+    expect(spawnCalls).toHaveLength(0);
+  });
+
+  it("a stale exit from a killed session does not clear the restarted session", () => {
+    hub.setGraph(BOARD, graphOf({ edges: true }), "/tmp");
+    hub.ensure(BOARD, "n1", 80, 24);
+    const stale = ptyFor("n1")!;
+
+    hub.restart(BOARD, "n1", 100, 30);
+    const fresh = ptyFor("n1")!;
+    expect(fresh).not.toBe(stale);
+
+    emitExit(stale, 99);
+
+    expect(hub.isNodeRunning(BOARD, "n1")).toBe(true);
+    expect(hub.size(BOARD, "n1")).toEqual({ cols: 100, rows: 30 });
+    hub.input(BOARD, "n1", "still alive");
+    expect(fresh.writes).toContain("still alive");
+  });
+
   // ── deliverCall emits the canonical handoff event ────────────────────────────
 
   it("deliverCall broadcasts a `handoff` event with the real from/to node ids", () => {
@@ -227,6 +417,36 @@ describe("PtyHub", () => {
       fromNodeId: "n1",
       toNodeId: "n2",
     });
+  });
+
+
+
+  it("deliverCall resolves recipients by raw id, unique partial label and duplicate-safe handle", () => {
+    const broadcasts: Array<Record<string, unknown>> = [];
+    hub.setBroadcast((msg) => broadcasts.push(msg));
+    hub.setGraph(BOARD, graphWithDuplicateDevelopers(), "/tmp");
+
+    expect(hub.deliverCall(BOARD, "n1", "dev-a", "by id").ok).toBe(true);
+    expect(hub.deliverCall(BOARD, "n1", "quality", "by label").ok).toBe(true);
+    expect(hub.deliverCall(BOARD, "n1", "developer-2", "by handle").ok).toBe(true);
+
+    const handoffs = broadcasts.filter((m) => m.type === "handoff");
+    expect(handoffs.map((m) => m.toNodeId)).toEqual(["dev-a", "qa", "dev-b"]);
+  });
+
+  it("deliverCall rejects ambiguous recipients and nudges the sender with valid handles", () => {
+    vi.useFakeTimers();
+    hub.setGraph(BOARD, graphWithDuplicateDevelopers(), "/tmp");
+    hub.ensure(BOARD, "n1", 80, 24);
+    hub.markReady(BOARD, "n1");
+    const sender = ptyFor("n1")!;
+
+    const res = hub.deliverCall(BOARD, "n1", "developer", "ambiguous");
+
+    expect(res.ok).toBe(false);
+    expect(res.error).toContain("developer-1 (Developer), developer-2 (Developer), quality-analyst (Quality Analyst)");
+    expect(sender.writes.join("")).toContain("[orchestra] Could not hand off");
+    expect(sender.writes.join("")).toContain("developer-1");
   });
 
   it("deliverCall does NOT broadcast a handoff when the recipient is invalid", () => {
