@@ -98,10 +98,10 @@ def register(ctx: Any) -> None:
     def pre_llm_call(**kwargs: Any) -> dict[str, Any] | None:
         """Inject the live orchestration appendix into the current turn."""
         try:
-            ctx = _get(
+            orchestra_ctx = _get(
                 f"/internal/orchestra-context?boardId={_board}&nodeId={_node}"
             )
-            appendix = ctx.get("appendix", "")
+            appendix = orchestra_ctx.get("appendix", "")
             if appendix:
                 return {"context": appendix}
         except Exception:
