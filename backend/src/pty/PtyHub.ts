@@ -390,9 +390,6 @@ export class PtyHub {
         this.broadcast({ type: "node_status", boardId, nodeId, status: "idle" });
         this.events.emit(`exit:${boardId}:${nodeId}`, exitCode ?? null);
       },
-      onReady: () => {
-        // onReady is not auto-triggered by PiRuntime; it comes from markReady.
-      },
     });
 
     this.broadcast({ type: "node_status", boardId, nodeId, status: "running" });

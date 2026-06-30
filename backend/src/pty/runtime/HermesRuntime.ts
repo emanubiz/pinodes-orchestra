@@ -1,5 +1,3 @@
-import fs from "node:fs";
-import path from "node:path";
 import pty from "node-pty";
 import { findInPath } from "./findInPath.js";
 import type { RuntimeSpawnConfig } from "./INodeRuntime.js";

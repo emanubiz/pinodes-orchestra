@@ -11,7 +11,6 @@ export interface RuntimeSpawnConfig {
   runtimeConfig?: Record<string, unknown>;
   onOutput: (data: string) => void;
   onExit: (code: number | null) => void;
-  onReady: () => void;
 }
 
 export interface INodeRuntime {

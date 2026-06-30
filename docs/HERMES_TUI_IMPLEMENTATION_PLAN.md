@@ -169,7 +169,7 @@ cd backend && npx vitest run src/pty/PtyHub.test.ts
 ### 2.1 — `backend/src/pty/runtime/INodeRuntime.ts`
 ```typescript
 export interface INodeRuntime {
-  spawn(config: RuntimeSpawnConfig): void; // chiama onOutput/onExit/onReady/onError
+  spawn(config: RuntimeSpawnConfig): void; // chiama onOutput/onExit
   write(data: string): void;
   inject(message: string): void;           // il "come": paste + settle + \r
   resize(cols: number, rows: number): void;
@@ -183,11 +183,10 @@ export interface RuntimeSpawnConfig {
   boardId: string; nodeId: string; label: string;
   cwd: string; cols: number; rows: number;
   systemPrompt: string; appendix: string;
+  orchestraUrl: string;
   runtimeConfig?: Record<string, unknown>; // non segreti
   onOutput: (data: string) => void;
   onExit: (code: number | null) => void;
-  onReady: () => void;
-  onError: (message: string) => void;
 }
 ```
 
@@ -212,7 +211,7 @@ Spostare la logica pi-specifica da PtyHub: `resolvePiCommand()`/`PI_BIN_NAMES`/`
 Tutti i test esistenti + quelli di Fase 1 passano **senza modifica**. Il mock di `node-pty` resta al confine `node-pty`.
 
 ### 2.5 — `backend/src/pty/runtime/PiRuntime.test.ts`
-`spawn` invoca `pty.spawn` con args corretti; `write` scrive; `inject` = paste+settle+`\r`; `kill` termina; `resize` ridimensiona ed è la fonte di `size()`; `onReady` NON automatico (arriva da `markReady`); `onExit` invocato all'uscita.
+`spawn` invoca `pty.spawn` con args corretti; `write` scrive; `inject` = paste+settle+`\r`; `kill` termina; `resize` ridimensiona ed è la fonte di `size()`; il segnale di ready NON è automatico (arriva da `markReady`, innescato da `POST /internal/ready`); `onExit` invocato all'uscita.
 
 ### 2.6 — Validazione
 ```bash

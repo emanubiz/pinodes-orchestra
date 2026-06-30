@@ -96,7 +96,6 @@ function spawnConfig(
     orchestraUrl: "http://localhost:3847",
     onOutput: vi.fn(),
     onExit: vi.fn(),
-    onReady: vi.fn(),
     ...overrides,
   };
 }
