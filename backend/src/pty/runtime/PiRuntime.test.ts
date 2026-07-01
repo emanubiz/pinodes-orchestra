@@ -255,17 +255,17 @@ describe("PiRuntime", () => {
 
   // ── inject ─────────────────────────────────────────────────────────────────
 
-  it("inject does a bracketed paste then submits after INJECT_SUBMIT_MS", () => {
+  it("inject does a bracketed paste then submits after the paste→submit delay", () => {
     vi.useFakeTimers();
     const rt = new PiRuntime();
     rt.spawn(spawnConfig());
 
-    rt.inject("do this task");
+    rt.inject("do task"); // short → pi's 80ms floor, no length margin
     const pty = lastPty();
     // paste arrives immediately
-    expect(pty.writes).toContain("\x1b[200~do this task\x1b[201~");
+    expect(pty.writes).toContain("\x1b[200~do task\x1b[201~");
 
-    // submit follows after INJECT_SUBMIT_MS (80ms)
+    // submit follows after the delay (pi floor = 80ms)
     expect(pty.writes).not.toContain("\r");
     vi.advanceTimersByTime(80);
     expect(pty.writes).toContain("\r");

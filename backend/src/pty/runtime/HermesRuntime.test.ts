@@ -229,7 +229,24 @@ describe("HermesRuntime", () => {
 
     rt.inject("task");
     expect(lastPty().writes).toContain("\x1b[200~task\x1b[201~");
+    // Hermes floors the paste→submit gap at 300ms — pi's old 80ms is not enough
+    // for its Textual TUI, which is exactly what dropped handoff submits.
     vi.advanceTimersByTime(80);
+    expect(lastPty().writes).not.toContain("\r");
+    vi.advanceTimersByTime(300 - 80);
+    expect(lastPty().writes).toContain("\r");
+  });
+
+  it("scales the paste→submit gap with message length (capped)", () => {
+    vi.useFakeTimers();
+    const rt = new HermesRuntime();
+    rt.spawn(spawnConfig());
+
+    const long = "x".repeat(4000); // 300 + 4000*0.05 = 500ms
+    rt.inject(long);
+    vi.advanceTimersByTime(300);
+    expect(lastPty().writes).not.toContain("\r"); // base alone no longer suffices
+    vi.advanceTimersByTime(200);
     expect(lastPty().writes).toContain("\r");
   });
 

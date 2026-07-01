@@ -31,6 +31,10 @@ function resolveHermesCommand(): string {
  */
 export class HermesRuntime extends PtyRuntime {
   private cmd = resolveHermesCommand();
+  // Hermes' Textual TUI ingests a bracketed paste slower than pi's readline, so
+  // Enter needs more headroom or it races the paste and never submits (the
+  // handoff message shows in the prompt but is never sent). See submitDelayMs.
+  protected override injectSubmitBaseMs = 300;
 
   spawn(config: RuntimeSpawnConfig): void {
     // Self-sufficiency: ship + enable the orchestra plugin in the user's Hermes
