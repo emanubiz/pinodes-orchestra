@@ -34,7 +34,12 @@ export function attachWebSocket(ws: WebSocket): void {
     }
   });
 
-  ws.send(JSON.stringify({ type: "connected" }));
+  ws.send(
+    JSON.stringify({
+      type: "connected",
+      runtimes: { hermes: process.env.PINODES_ORCHESTRA_HERMES === "true" },
+    }),
+  );
 }
 
 function handleMessage(ws: WebSocket, msg: Record<string, unknown>): void {

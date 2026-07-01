@@ -19,8 +19,11 @@ interface RuntimeState {
   overlayNodeId: string | null;
   prompts: SystemPrompt[];
   runPromptDraft: string;
+  /** Whether the backend has PINODES_ORCHESTRA_HERMES=true. null until known. */
+  hermesAvailable: boolean | null;
 
   setConnected: (v: boolean) => void;
+  setHermesAvailable: (v: boolean) => void;
   setEnforcement: (boardId: string, nodeId: string, enabled: boolean) => void;
   setActiveBoardId: (boardId: string) => void;
   setSelectedNodeId: (id: string | null) => void;
@@ -48,8 +51,10 @@ export const useRuntimeStore = create<RuntimeState>((set, get) => ({
   overlayNodeId: null,
   prompts: [],
   runPromptDraft: "",
+  hermesAvailable: null,
 
   setConnected: (v) => set({ connected: v }),
+  setHermesAvailable: (v) => set({ hermesAvailable: v }),
   setEnforcement: (boardId, nodeId, enabled) =>
     set((s) => ({ enforcement: { ...s.enforcement, [nodeKey(boardId, nodeId)]: enabled } })),
   setActiveBoardId: (boardId) =>

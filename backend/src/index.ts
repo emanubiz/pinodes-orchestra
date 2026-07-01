@@ -73,6 +73,9 @@ app.get("/api/health", async () => ({
   name: "pinodes-orchestra",
   version: "0.1.0",
   port: PORT,
+  runtimes: {
+    hermes: process.env.PINODES_ORCHESTRA_HERMES === "true",
+  },
 }));
 
 /** Server info for clients that need a sensible default cwd (browser has no process.cwd). */
@@ -83,6 +86,9 @@ app.get("/api/info", async () => ({
   port: PORT,
   defaultCwd: process.cwd(),
   wsPath: "/ws",
+  runtimes: {
+    hermes: process.env.PINODES_ORCHESTRA_HERMES === "true",
+  },
 }));
 
 // Called by the call_agent extension running inside a node's pi terminal.

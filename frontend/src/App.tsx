@@ -69,6 +69,7 @@ export function App() {
   const setPrompts = useRuntimeStore((s) => s.setPrompts);
   const setActiveBoardId = useRuntimeStore((s) => s.setActiveBoardId);
   const clearBoardRuntime = useRuntimeStore((s) => s.clearBoardRuntime);
+  const setHermesAvailable = useRuntimeStore((s) => s.setHermesAvailable);
 
   useEffect(() => {
     // Embedded host (VS Code) provides the workspace cwd directly: bind the
@@ -79,14 +80,17 @@ export function App() {
     }
     void apiFetch("/api/info")
       .then((r) => r.json())
-      .then((data: { defaultCwd?: string }) => {
+      .then((data: { defaultCwd?: string; runtimes?: { hermes?: boolean } }) => {
         if (data.defaultCwd) setDefaultCwd(data.defaultCwd);
+        if (typeof data.runtimes?.hermes === "boolean") {
+          setHermesAvailable(data.runtimes.hermes);
+        }
       })
       .catch((err) => {
         console.error("pinodes-orchestra: /api/info unreachable", err);
         /* backend offline — BoardTabs will use "." */
       });
-  }, [setDefaultCwd, bindWorkspace]);
+  }, [setDefaultCwd, bindWorkspace, setHermesAvailable]);
 
   useEffect(() => {
     setActiveBoardId(activeBoard.id);

@@ -56,6 +56,7 @@ function resetStore() {
     overlayNodeId: null,
     prompts: [],
     runPromptDraft: "",
+    hermesAvailable: null,
   });
 }
 
@@ -72,6 +73,7 @@ const terminalCtx = {
   onDelete: vi.fn(),
   onEditPrompt: vi.fn(),
   onToggleFinal: vi.fn(),
+  onSetRuntime: vi.fn(),
 };
 
 describe("AgentNode — refresh button", () => {
@@ -245,5 +247,42 @@ describe("AgentNode — refresh button", () => {
     const restoredBtn = screen.getByTitle("Restart pi (pick up config/extension changes)");
     expect(restoredBtn).toBeTruthy();
     expect((restoredBtn as HTMLButtonElement).disabled).toBe(false);
+  });
+});
+
+describe("AgentNode — runtime selector", () => {
+  beforeEach(() => {
+    resetStore();
+    vi.clearAllMocks();
+  });
+
+  function renderNode(data: typeof baseData = baseData) {
+    return render(
+      <TerminalContext.Provider value={terminalCtx}>
+        <AgentNode
+          id="n1"
+          data={data}
+          selected={false}
+          type="agent"
+          dragging={false}
+          zIndex={0}
+          selectable
+          deletable
+          draggable
+          isConnectable
+          positionAbsoluteX={0}
+          positionAbsoluteY={0}
+          targetPosition={Position.Left}
+          sourcePosition={Position.Right}
+        />
+      </TerminalContext.Provider>,
+    );
+  }
+
+  it("renders pi/hermes toggle and calls onSetRuntime on change", () => {
+    renderNode();
+    const hermesBtn = screen.getByRole("button", { name: "hm" });
+    act(() => { hermesBtn.click(); });
+    expect(terminalCtx.onSetRuntime).toHaveBeenCalledWith("n1", "hermes");
   });
 });

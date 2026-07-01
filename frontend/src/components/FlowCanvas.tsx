@@ -16,7 +16,7 @@ import "@xyflow/react/dist/style.css";
 import { AgentNode } from "./AgentNode";
 import { useRuntimeStore } from "../stores/runtimeStore";
 import { TerminalContext } from "../lib/termTheme";
-import type { BoardSnapshot, WorkflowNodeData } from "../types";
+import type { BoardSnapshot, WorkflowNodeData, NodeRuntime } from "../types";
 
 const nodeTypes = { agent: AgentNode };
 
@@ -210,6 +210,33 @@ export function FlowCanvas({
     [setNodes],
   );
 
+  const onSetRuntime = useCallback(
+    (nodeId: string, runtime: NodeRuntime) => {
+      const node = nodes.find((n) => n.id === nodeId);
+      const prev = node?.data.runtime ?? "pi";
+      if (prev === runtime) return;
+
+      const status = nodeStatusMap[`${boardId}:${nodeId}`];
+      if (status && status !== "idle") {
+        const ok = window.confirm(
+          `Switch runtime from ${prev} to ${runtime}? The current session will be restarted.`,
+        );
+        if (!ok) return;
+      }
+
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === nodeId ? { ...n, data: { ...n.data, runtime } } : n,
+        ),
+      );
+
+      if (status && status !== "idle") {
+        send({ type: "restart_node", nodeId });
+      }
+    },
+    [nodes, nodeStatusMap, boardId, setNodes, send],
+  );
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.key === "Delete" || e.key === "Backspace") && selectedNodeId) {
@@ -227,7 +254,7 @@ export function FlowCanvas({
 
   return (
     <TerminalContext.Provider
-      value={{ boardId, send, onExpand, onDelete: onDeleteNode, onEditPrompt, onToggleFinal }}
+      value={{ boardId, send, onExpand, onDelete: onDeleteNode, onEditPrompt, onToggleFinal, onSetRuntime }}
     >
     <div className="relative h-full w-full">
       {pendingDelete && (
