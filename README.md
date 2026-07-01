@@ -180,5 +180,17 @@ When off (default), `runtime: "hermes"` degrades to pi — production is unchang
   instead of `--extension call-agent.ts`.
 - The xterm UI renders Hermes identically to pi — zero frontend changes needed.
 
+**Where the per-turn appendix lands differs from pi — by design, not a bug.**
+pi's extension refreshes the *system prompt* every turn (`before_agent_start`).
+Hermes has no equivalent hook for that: `pre_llm_call` instead returns
+`{"context": "<appendix>"}`, which Hermes appends to that turn's **user
+message**, not the system prompt — confirmed against Hermes source
+(`agent/turn_context.py`). Functionally equivalent (the model sees the
+recipients/finality/kanban context every turn, never persisted into history),
+but if you inspect a Hermes session's raw messages, don't expect to find the
+appendix in the system prompt slot — look at the per-turn user message
+instead. See [docs/HERMES_TUI_SPIKE_RESULT.md](./docs/HERMES_TUI_SPIKE_RESULT.md)
+(§3, "Sistema plugin/hook") for the verified hook contract.
+
 **Details:** [docs/HERMES_TUI_IMPLEMENTATION_PLAN.md](./docs/HERMES_TUI_IMPLEMENTATION_PLAN.md),
 [docs/HERMES_TUI_SPIKE_RESULT.md](./docs/HERMES_TUI_SPIKE_RESULT.md).
