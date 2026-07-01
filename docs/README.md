@@ -38,7 +38,8 @@ pinodes-orchestra/
     │   └── HERMES_TUI_IMPACT_ANALYSIS.md
     │
     └── reviews/                       ← Audit / review artifacts (point-in-time)
-        └── AUDIT_REVIEW_hermes-tui-runtime.md
+        ├── AUDIT_REVIEW_hermes-tui-runtime.md
+        └── REVIEW_optimization_multi_harness.md
 ```
 
 Also: [`vscode-extension/README.md`](../vscode-extension/README.md) — Cursor / VS Code extension.
