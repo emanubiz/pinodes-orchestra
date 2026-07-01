@@ -2,6 +2,33 @@
 
 All notable changes to the **PiNodes Orchestra** extension are documented here.
 
+## 0.2.20
+
+### Added
+
+- **Programmatic API completion.** `POST /api/v1/orchestra/boards/:boardId/nodes/:nodeId/restart`
+  (REST parity with the WS `restart_node` — remote/mobile clients had stop and
+  inject but no restart), `runtime` (`"pi" | "hermes"`) on every node in
+  `GET …/status`, and CLI `node stop` / `node restart` subcommands.
+
+### Fixed
+
+- **`POST /flows` no longer leaks a board on failure.** When the run step
+  failed (e.g. a graph without `entryNodeId` and none provided), the request
+  returned 500 and the temporary board it had created persisted forever. It now
+  returns 400 and deletes the board.
+
+### Changed
+
+- **API input hardening.** `runtime` is validated against the known set
+  (unknown values were silently persisted), `runtimeConfig` must be a plain
+  object, `PATCH …/nodes/:nodeId` type-checks `label` / `promptId` / `position`
+  / `canBeFinal` like the POST always did, and `waitTimeoutMs` is clamped to
+  `[1s, 1h]` so a typo can't make the wait fire instantly or pin the request.
+- **README front page** refreshed: multi-runtime tagline, feature summary,
+  Open VSX badge. Claude Code runtime plan rewritten (v2) around the shared
+  `@@HANDOFF` text protocol.
+
 ## 0.2.19
 
 ### Added
