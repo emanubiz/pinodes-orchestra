@@ -1,6 +1,19 @@
 # pinodes-orchestra
 
-Visual canvas of **pi** agent consoles. Semi-automatic multi-agent pipeline with human intervention on any node.
+[![Open VSX](https://img.shields.io/open-vsx/v/emanubiz/pinodes-orchestra-vscode?label=Open%20VSX)](https://open-vsx.org/extension/emanubiz/pinodes-orchestra-vscode)
+
+**Visual multi-agent orchestration on a canvas of live terminals.** Every node
+is a real AI agent process (**pi** or **Hermes**, mixed freely) in its own PTY;
+edges define who may hand off to whom; you can type into any terminal at any
+time. Semi-automatic pipelines with a human in the loop on every node.
+
+- **Multi-runtime nodes** — `pi` (default) and `hermes --tui`, chosen per node; Claude Code planned
+- **One handoff standard** — agents delegate with `@@HANDOFF` text blocks, identical across runtimes, gated by graph edges
+- **Deterministic delivery** — closed-loop submit confirmation + handoff watchdog: tasks can't silently stall
+- **Kanban + Timeline** — cards advance with node status; every handoff is logged
+- **29 built-in roles** — software team + research / writing / business / data pipelines
+- **Programmatic API + CLI** — run whole flows from CI or scripts, no UI needed
+- **IDE extension** — same canvas inside VS Code / Cursor / Windsurf, one isolated backend per window
 
 This is a **web app / PWA**: React frontend + Node.js backend (Fastify + WebSocket + SQLite + PTY).
 
@@ -70,6 +83,7 @@ Details: [`vscode-extension/README.md`](./vscode-extension/README.md),
 - Node.js 24.x (native modules `node-pty`/`better-sqlite3` are built for Node 24 / ABI 137)
 - `@earendil-works/pi-coding-agent` globally or in `backend/node_modules`
 - API keys in `~/.pi/agent/auth.json` or env vars
+- *(optional)* the `hermes` CLI on PATH to enable Hermes runtime nodes — auto-detected, zero further setup ([guide](./docs/guides/HERMES_RUNTIME.md))
 
 ## Usage
 

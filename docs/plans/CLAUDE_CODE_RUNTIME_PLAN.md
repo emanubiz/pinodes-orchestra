@@ -1,288 +1,244 @@
-# Claude Code runtime — pre-implementation plan
+# Claude Code runtime — implementation plan (test-first)
 
-> **Status: planned.** This document is the design/analysis pass *before* writing
-> code. It describes how to add **Claude Code** as a third node runtime alongside
-> `pi` and `hermes`, reusing the existing `INodeRuntime` abstraction and the
-> existing `/internal/*` contract — no new backend endpoints.
+> **Date:** 2026-07-02 (v2 — full rewrite; supersedes the 2026-07-01 MCP-tool draft)
+> **Status:** 🔜 planned — next native runtime after Hermes
+> **Guiding principle:** same as the Hermes plan — every phase starts with tests,
+> never change existing behavior without tests that capture it, backward
+> compatibility always guaranteed.
 >
-> **Revision 2026-07-02 — handoff protocol superseded.** Since `a46eab1` all
-> runtimes share **one text-sentinel protocol** (`@@HANDOFF:<handle> … @@END`,
-> `@@CARD`, `@@DONE`) instead of per-runtime native tools — the Hermes plugin no
-> longer registers `orchestra_handoff`/`orchestra_card`; it parses the sentinels
-> in its `transform_llm_output` hook. **§2.2 (MCP tool server for handoff/card)
-> is therefore superseded:** the Claude runtime shim should parse the same
-> sentinels from the turn's final output (e.g. in the `Stop` hook, reading the
-> transcript) and POST `/internal/call-agent` / `/internal/card-status`, exactly
-> like the Hermes plugin. The lifecycle-hook mapping (§2.3) remains valid, with
-> one addition: the shim must also POST the (since-added) `/internal/turn-started`
-> once per turn for the closed-loop submit confirmation (see
-> [`ARCHITECTURE.md`](../../ARCHITECTURE.md) § Closed-loop submit confirmation).
-> §3 is resolved by the text protocol: the `Stop` hook knows whether the turn's
-> output contained a `@@HANDOFF` block.
->
-> Companion docs: [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (runtime model),
-> [`HERMES_TUI_IMPLEMENTATION_PLAN.md`](../archive/HERMES_TUI_IMPLEMENTATION_PLAN.md) (✅ completed)
-> (the pattern this mirrors), [`MULTI_INSTANCE.md`](../guides/MULTI_INSTANCE.md)
-> (per-window isolation, unaffected by this work).
+> Companion docs: [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (runtime model,
+> handoff protocol, closed-loop submit),
+> [`HERMES_TUI_IMPLEMENTATION_PLAN.md`](../archive/HERMES_TUI_IMPLEMENTATION_PLAN.md)
+> (✅ the completed pattern this mirrors),
+> [`MULTI_INSTANCE.md`](../guides/MULTI_INSTANCE.md) (per-window isolation,
+> unaffected).
 
 ---
 
-## 1. Why Claude Code is the natural next runtime
+## 0. Architectural decision — text sentinels in a PTY, no MCP tools
 
-The Hermes integration already proved the design: a node is a PTY, and
-agent↔orchestra coordination happens through the **shared `@@HANDOFF` text
-protocol** plus **lifecycle hooks**, all bridging to the same `/internal/*`
-endpoints `pi` uses. Claude Code maps onto that pattern almost one-to-one:
+A `runtime: "claude"` node is **one interactive `claude` process in a PTY**,
+exactly like pi and Hermes. Coordination uses the **shared text-sentinel
+protocol** (`@@HANDOFF:<handle> … @@END`, `@@CARD:<col>`, `@@DONE`) — the same
+single orchestration standard adopted across runtimes in `a46eab1` — parsed by
+a **`Stop` hook** that reads the turn's final output from the transcript.
 
-| Orchestra need | Hermes (implemented) | Claude Code (this plan) |
-|---|---|---|
-| Visual node = live terminal | `hermes --tui` in PTY | `claude` (interactive) in PTY |
-| Handoff / card expression | `@@HANDOFF`/`@@CARD` sentinels parsed in `transform_llm_output` | **Same sentinels**, parsed from the turn's output (`Stop` hook / output transform) |
-| Per-turn context refresh | `pre_llm_call` hook → `GET /internal/orchestra-context` | **`UserPromptSubmit` hook** → same endpoint (emits `additionalContext`) |
-| Ready signal | `on_session_start` → `POST /internal/ready` | **`SessionStart` hook** → same endpoint |
-| Turn-end watchdog | `post_llm_call` → `POST /internal/turn-ended` | **`Stop` hook** → same endpoint |
-| Per-node system prompt | `HERMES_EPHEMERAL_SYSTEM_PROMPT` env | `--append-system-prompt` (or `--system-prompt`) |
-| Callback URL / auth | `PINODES_ORCHESTRA_URL` + `…_TOKEN` env | **identical** env contract |
+**Why not MCP tools** (the v1 draft): the Hermes experience proved native tools
+are the fragile path — `orchestra_handoff` silently broke on Hermes' tool-dispatch
+convention, which is exactly the class of failure a text protocol cannot have.
+One protocol also means one appendix text, one parser contract, one thing to
+debug. MCP remains a *possible future add-on* (e.g. a `orchestra_status` query
+tool), never the handoff channel.
 
-The decisive property: Claude Code has **both** a tool surface (MCP) *and* a
-real lifecycle-hook system. Cursor has MCP but no per-turn hook; that gap is why
-Claude Code, not Cursor, is the next runtime. See the comparison in
-[`ARCHITECTURE.md`](../../ARCHITECTURE.md) once this lands.
+**What Claude Code provides that makes this clean** (verify exact names in the
+P0 spike against the installed CLI — the surface evolves):
 
-**Reuse, not new surface.** This integration adds **zero** `/internal/*`
-endpoints. `orchestra_handoff` → `POST /internal/call-agent`, `orchestra_card` →
-`POST /internal/card-status`, plus the three lifecycle endpoints already used by
-both `pi` and Hermes (`/internal/ready`, `/internal/orchestra-context`,
-`/internal/turn-ended`). The multi-instance callback invariant
-([`MULTI_INSTANCE.md`](../guides/MULTI_INSTANCE.md)) holds unchanged: `ClaudeRuntime`
-passes `orchestraUrl: BASE_URL` (from `PtyHub.ts`) into the child, so callbacks
-land in the right per-window backend.
+| Orchestra need | pi (shipped) | Hermes (shipped) | Claude Code (this plan) |
+|---|---|---|---|
+| Live terminal per node | `pi` CLI in PTY | `hermes --tui` in PTY | `claude` (interactive) in PTY |
+| Handoff / card / done | `@@HANDOFF` parsed by extension at `agent_end` | Same sentinels, parsed in `transform_llm_output` | Same sentinels, parsed by the **`Stop` hook** from the transcript |
+| Ready signal | ext `session_start` → `POST /internal/ready` | `on_session_start` → same | **`SessionStart` hook** → same |
+| Turn-started (closed-loop submit confirm) | `before_agent_start` → `POST /internal/turn-started` | `pre_llm_call` (gated once/turn) → same | **`UserPromptSubmit` hook** → same |
+| Per-turn context refresh | `before_agent_start` → `GET /internal/orchestra-context` → system prompt | `pre_llm_call` → user-message appendix | **`UserPromptSubmit` hook** → emit `additionalContext` |
+| Turn-ended + watchdog | ext `agent_end` (client-side `enforceIntent`) | `post_llm_call` → server-side nudge | **`Stop` hook** → `POST /internal/turn-ended`; **server-side nudge** (like Hermes) |
+| Per-node system prompt | `--system-prompt` | `HERMES_EPHEMERAL_SYSTEM_PROMPT` env | `--append-system-prompt` |
+| Toolset | `--tools` (`runtimeConfig.toolset`) | `-t` (Hermes vocabulary) | `--allowedTools` (Claude vocabulary: `Read,Edit,Write,Bash,Grep,…`) |
+| Callback URL / auth | `PINODES_ORCHESTRA_*` env | identical | **identical** — hooks are child processes and inherit the PTY env |
+
+**Zero new backend endpoints.** The whole integration is client-side bridging to
+the existing `/internal/*` contract (`ready`, `orchestra-context`,
+`turn-started`, `turn-ended`, `call-agent`, `card-status`). The multi-instance
+invariant holds unchanged: hooks read `PINODES_ORCHESTRA_URL` from env, so
+callbacks land in the right per-window backend.
+
+Sentinels stay visible in the Claude terminal (as they do for pi — only Hermes
+can strip them, via its output-transform hook). Cosmetic, accepted.
 
 ---
 
-## 2. Pieces to build
+## 1. Pieces to build
 
 ```
 backend/
   src/pty/runtime/
-    ClaudeRuntime.ts          (new)  — extends PtyRuntime, spawns `claude` in a PTY
-    ClaudeRuntime.test.ts     (new)  — mirrors PiRuntime/HermesRuntime tests
-  claude-mcp/orchestra/       (new)  — stdio MCP server: the two native tools
-    server.ts                        — register_tool analog (handoff, card)
-    package.json / tsconfig          — buildable to a single entry the CLI can spawn
-  claude-settings/
-    orchestra.settings.json   (new)  — hooks: SessionStart / UserPromptSubmit / Stop
+    ClaudeRuntime.ts            (new)  extends PtyRuntime; only spawn() differs
+    ClaudeRuntime.test.ts       (new)  mirrors HermesRuntime.test.ts
+    claudeAvailability.ts       (new)  mirrors hermesAvailability.ts (PATH detect + override)
+    claudeAvailability.test.ts  (new)
+  claude-hooks/
+    orchestra-hook.mjs          (new)  ONE Node script, dispatched by hook event name
+    orchestra-hook.test.ts      (new)  parse/POST logic tested in isolation
+  src/pty/runtime/resolveClaudeSettings.ts (new)
+                                       writes the per-boot hooks settings JSON
+                                       (absolute script paths baked at runtime)
 ```
 
-Touched existing files:
+Touched existing files (all small):
 
 ```
-backend/src/pty/PtyHub.ts     — runtime selection: add the "claude" branch + feature flag
-backend/src/types.ts          — WorkflowNode.runtime union: add "claude"
-ARCHITECTURE.md               — runtime table + handoff section
+backend/src/types.ts               NodeRuntime union: + "claude"
+frontend/src/types.ts              mirror
+backend/src/routes/orchestra.ts    VALID_RUNTIMES: + "claude"
+backend/src/pty/PtyHub.ts          spawn selection branch; watchdog gate (see §3)
+backend/src/index.ts               /api/info + /api/health: runtimes.claude
+backend/src/ws/handler.ts          `connected` message: runtimes.claude
+frontend/src/components/RuntimeSelector.tsx / RuntimeBadge.tsx   third option, "cc" badge
+ARCHITECTURE.md, docs/README.md, docs/guides/ (new CLAUDE_RUNTIME.md)
 ```
 
-### 2.1 `ClaudeRuntime extends PtyRuntime`
+### 1.1 `ClaudeRuntime extends PtyRuntime`
 
-Same shape as `HermesRuntime` — only `spawn()` differs. Sketch:
+Only `spawn()`; inject/resize/kill/markReady/size are inherited (bracketed-paste
++ `\r` submit is PTY-generic — P0 verifies it against the Claude TUI).
 
 ```ts
 export class ClaudeRuntime extends PtyRuntime {
-  private cmd = resolveClaudeCommand(); // findInPath("claude"), Windows .cmd-aware
-
   spawn(config: RuntimeSpawnConfig): void {
-    const mcpConfig = resolveOrchestraMcpConfigPath();   // points at claude-mcp/orchestra
-    const settings  = resolveOrchestraSettingsPath();    // hooks file
-
+    const cmd = resolveClaudeCommand();          // findInPath("claude"), Windows .cmd-aware
+    const settings = resolveClaudeSettings();    // per-boot hooks JSON (see 1.3)
     const args = [
       "--append-system-prompt", config.systemPrompt,
-      "--mcp-config", mcpConfig,
       "--settings", settings,
-      // Pre-allow the orchestra tools + default toolset so the PTY never blocks
-      // on a permission prompt (there is no human to approve mid-pipeline).
-      "--allowedTools",
-      "mcp__orchestra__orchestra_handoff,mcp__orchestra__orchestra_card," +
-        "Read,Edit,Write,Bash,Grep",
-      // permission mode chosen to match the `pi`/hermes "just run" behaviour:
-      "--permission-mode", "acceptEdits",
+      // No human sits at a pipeline node: pre-allow the toolset so the PTY
+      // never blocks on a permission prompt. Vocabulary is Claude's own.
+      "--allowedTools", resolveToolset(config.runtimeConfig, "Read,Edit,Write,Bash,Grep"),
+      "--permission-mode", "acceptEdits",        // exact flag semantics: P0
     ];
-
-    const term = pty.spawn(this.cmd.file, [...this.cmd.baseArgs, ...args], {
-      name: "xterm-256color",
-      cols: config.cols, rows: config.rows, cwd: config.cwd,
-      env: {
-        ...process.env,
-        PINODES_ORCHESTRA_URL: config.orchestraUrl,    // → BASE_URL, multi-instance safe
-        PINODES_ORCHESTRA_BOARD: config.boardId,
-        PINODES_ORCHESTRA_NODE: config.nodeId,
-        PINODES_ORCHESTRA_FALLBACK_APPENDIX: config.appendix,
-        ...(process.env.PINODES_ORCHESTRA_TOKEN
-          ? { PINODES_ORCHESTRA_TOKEN: process.env.PINODES_ORCHESTRA_TOKEN }
-          : {}),
-      } as Record<string, string>,
-    });
-    this.ptyInstance = term; this._cols = config.cols; this._rows = config.rows;
-    this._ready = false;
-    term.onData((d) => config.onOutput(d));
-    term.onExit(({ exitCode }) => { this.ptyInstance = null; this._ready = false; config.onExit(exitCode ?? null); });
+    // env: PINODES_ORCHESTRA_URL/_BOARD/_NODE/_TOKEN/_FALLBACK_APPENDIX —
+    // identical contract to PiRuntime/HermesRuntime (hooks inherit it).
   }
 }
 ```
 
-`inject()`, `resize()`, `kill()`, `markReady()`, `isReady()`, `size()` are all
-inherited from `PtyRuntime` — bracketed-paste inject already works for any PTY
-TUI, so it should work for the Claude Code TUI unchanged (**verify in the spike**,
-§5 P0).
+`resolveToolset` already exists and is runtime-agnostic — reuse with a
+Claude-specific default.
 
-### 2.2 The `orchestra` MCP server (the `register_tool` analog)
+### 1.2 The hook bridge — one script, four events
 
-A small **stdio MCP server** that Claude Code spawns as a child (config in
-`--mcp-config`). It is the direct translation of the two
-`ctx.register_tool(...)` blocks in `backend/hermes-plugins/orchestra/__init__.py`.
-It reads `PINODES_ORCHESTRA_URL` / `_BOARD` / `_NODE` / `_TOKEN` from the env it
-inherits (passed by `ClaudeRuntime` → `claude` → MCP child) and exposes exactly
-two tools, each a thin POST:
+`--settings` wires **one** `orchestra-hook.mjs` to four events; the script
+switches on the event name it receives on stdin. It must **fail open** (swallow
+network errors, short timeout ~5s) exactly like the Hermes plugin — the backend
+already tolerates a missed `ready` (fallback timeout), `turn-started` (submit
+watch re-sends `\r`), and `turn-ended` (watchdog is best-effort).
 
-| MCP tool | Args | Bridges to |
-|---|---|---|
-| `orchestra_handoff` | `recipient`, `message` | `POST /internal/call-agent` `{boardId, fromNodeId, targetNodeId, message}` |
-| `orchestra_card` | `column` (todo/in_progress/test/review/done) | `POST /internal/card-status` `{boardId, column}` |
+| Hook event | Action |
+|---|---|
+| `SessionStart` | `POST /internal/ready {boardId, nodeId}` |
+| `UserPromptSubmit` | `POST /internal/turn-started` (closed-loop submit confirm), then `GET /internal/orchestra-context` → print `{"hookSpecificOutput": {"additionalContext": <appendix>}}` |
+| `Stop` | Read the transcript (`transcript_path` from the hook's stdin JSON), take the last assistant message, parse sentinels: each `@@HANDOFF:<handle>…@@END` → `POST /internal/call-agent`; `@@CARD:<col>` → `POST /internal/card-status`; then `POST /internal/turn-ended {handoffCalledThisTurn: <parsed ≥ 1>}` |
+| `SessionEnd` *(if available)* | best-effort no-op today (PTY exit already covers cleanup) |
 
-Tool surface in Claude Code is namespaced: `mcp__orchestra__orchestra_handoff`,
-`mcp__orchestra__orchestra_card` (that is the name to pre-allow in
-`--allowedTools`). Same validation as Hermes: reject unknown columns; return the
-backend's `message` on success, a readable error otherwise.
+`boardId`/`nodeId`/URL/token come from the inherited `PINODES_ORCHESTRA_*` env —
+**self-gating**: when `PINODES_ORCHESTRA_NODE` is absent the script exits 0
+immediately, so a user's own `claude` sessions are never affected (same
+isolation rule as the Hermes plugin).
 
-> The MCP server should **self-gate** like the Hermes plugin: if
-> `PINODES_ORCHESTRA_NODE` is absent, expose no tools (so a stray `claude` on the
-> same machine that happens to load the config is unaffected).
+The sentinel parser must be **the same contract** as pi/Hermes: multiple
+HANDOFF blocks per turn allowed, recipient by handle, `@@DONE` recognized.
+Port the regexes from `call-agent.ts` (they are the reference implementation)
+and unit-test them against the same fixtures.
 
-### 2.3 Hooks settings (lifecycle bridge)
+### 1.3 Settings resolution
 
-A `--settings` JSON wiring three hooks to the existing endpoints. Each hook is a
-tiny script (Node one-liner or a `backend/claude-hooks/*.mjs`) that POSTs/GETs:
-
-| Hook event | Action | Endpoint |
-|---|---|---|
-| `SessionStart` | mark node booted → flush queued injects | `POST /internal/ready` `{boardId, nodeId}` |
-| `UserPromptSubmit` | fetch live appendix, return it as `additionalContext` | `GET /internal/orchestra-context?boardId&nodeId` |
-| `Stop` | signal end-of-turn for the determinism watchdog | `POST /internal/turn-ended` `{boardId, nodeId, handoffCalledThisTurn}` |
-
-`boardId`/`nodeId` come from env (`PINODES_ORCHESTRA_BOARD/_NODE`), same as the
-Hermes plugin. The hook scripts must **fail open** (swallow errors) exactly like
-the Hermes plugin's `try/except: pass` — the backend already has a fallback
-timeout for `ready`, and the watchdog tolerates a missed `turn-ended`.
+Hook commands need absolute paths and the bundle location differs per install
+(repo checkout vs VSIX `server/`). `resolveClaudeSettings()` writes (once per
+backend boot, to the data dir) a settings JSON whose hook commands point at the
+bundled `claude-hooks/orchestra-hook.mjs` via absolute path, resolved with the
+same `PINODES_ORCHESTRA_ROOT`-aware logic used for prompts/extension today.
+Idempotent, no global state touched — **no `~/.claude` writes**, everything is
+passed per-spawn (`--settings`), which is *cleaner than Hermes* (no install step
+at all).
 
 ---
 
-## 3. The one non-trivial decision: `handoffCalledThisTurn`
+## 2. Availability & selection
 
-Hermes tracks this with a per-session Python global set inside `orchestra_handoff`
-and read in `post_llm_call`. Claude Code's hook scripts are **separate processes**
-from the MCP server, so they can't share an in-memory flag. Two options:
+Mirror the Hermes pattern exactly:
 
-- **Option A — reuse the contract verbatim.** A `PostToolUse` hook matching
-  `mcp__orchestra__orchestra_handoff` writes a marker (e.g. touch a temp file
-  keyed by session id); the `Stop` hook reads + clears it and sends
-  `handoffCalledThisTurn` accordingly. Keeps `/internal/turn-ended` unchanged.
-- **Option B — let the backend infer it (recommended, cleaner).** The backend
-  already receives the handoff via `POST /internal/call-agent`; it can record
-  "node X called handoff since its last turn-ended" and ignore the body flag.
-  `/internal/turn-ended` then needs no `handoffCalledThisTurn` from the client,
-  which *also* simplifies the Hermes plugin later. Small backend change, shared
-  benefit.
-
-**Recommendation: B**, gated so it doesn't regress Hermes (treat a present
-`handoffCalledThisTurn` as an override when sent). Decide before P3.
-
----
-
-## 4. Runtime selection & types
+- `claudeAvailability.ts`: `claude` on the backend PATH → available;
+  `PINODES_ORCHESTRA_CLAUDE=false` forces off, `=true` forces on.
+- `/api/info`, `/api/health`, WS `connected` expose `runtimes.claude` next to
+  `runtimes.hermes`; the runtime selector shows the third option only when
+  available, and a node whose runtime is unavailable **falls back to pi at
+  spawn** (existing behavior, keep it).
 
 ```ts
-// types.ts
-interface WorkflowNode {
-  runtime?: "pi" | "hermes" | "claude";   // absent = "pi"
-  runtimeConfig?: Record<string, unknown>;
-}
-```
-
-```ts
-// PtyHub.ts — extend the existing ternary, keep flags evaluated at spawn time
-const claudeEnabled = process.env.PINODES_ORCHESTRA_CLAUDE === "true";
+// PtyHub spawn selection (evaluated at spawn time, like Hermes)
 const runtime: INodeRuntime =
-  node?.runtime === "hermes" && hermesEnabled ? new HermesRuntime()
-  : node?.runtime === "claude" && claudeEnabled ? new ClaudeRuntime()
+  node?.runtime === "hermes" && isHermesRuntimeAvailable() ? new HermesRuntime()
+  : node?.runtime === "claude" && isClaudeRuntimeAvailable() ? new ClaudeRuntime()
   : new PiRuntime();
 ```
 
-Feature flag `PINODES_ORCHESTRA_CLAUDE` (default `false`), mirroring
-`PINODES_ORCHESTRA_HERMES`. Document both in `ARCHITECTURE.md → Feature flags`.
+---
+
+## 3. The one real backend change: the watchdog gate
+
+`PtyHub.handleTurnEnded` currently gates the server-side handoff nudge to
+`runtime === "hermes"` (pi enforces intent client-side). Claude has no
+client-side enforcer, so it needs the server-side nudge too. Replace the
+equality check with an explicit capability set:
+
+```ts
+/** Runtimes whose non-final-node handoff enforcement is server-side
+ *  (pi enforces client-side in its extension). */
+const SERVER_NUDGED_RUNTIMES: ReadonlySet<NodeRuntime> = new Set(["hermes", "claude"]);
+```
+
+This is the only PtyHub logic change; everything else is additive. It gets its
+own characterization test **before** the change (hermes nudged / pi not), then
+the claude case is added.
 
 ---
 
-## 5. Phases
+## 4. Phases (test-first)
 
 | Phase | Deliverable | Gate |
 |---|---|---|
-| **P0 spike** | Manually run `claude` in a PTY with `--mcp-config` + `--settings`; confirm: TUI renders, bracketed-paste inject submits, an MCP tool call reaches a stub backend, hooks fire. | This is the make-or-break; do it before writing `ClaudeRuntime`. |
-| **P1** | `ClaudeRuntime.ts` (+ `resolveClaudeCommand`, Windows-aware via `findInPath`). | Unit test mirrors `PiRuntime.test.ts`. |
-| **P2** | `claude-mcp/orchestra` stdio server (two tools, self-gating). | Unit test: tool → correct POST shape. |
-| **P3** | Hooks settings + scripts; resolve §3 (Option B). | `ready`/`context`/`turn-ended` round-trip against the running backend. |
-| **P4** | `PtyHub` selection branch + `WorkflowNode.runtime` "claude" + flag. | `detect_changes()` shows only expected symbols. |
-| **P5** | `ClaudeRuntime.test.ts` + MCP server test green. | Full verify suite (below). |
-| **P6** | Docs: flip this file to *implemented*, update `ARCHITECTURE.md` runtime table + handoff section. | — |
+| **P0 — spike (½–1 day)** | Manually: `claude` in a PTY via `node -e` + node-pty; verify ① TUI renders through xterm-size PTY, ② bracketed-paste + `\r` submits, ③ `--settings` hooks fire (log to file), ④ `UserPromptSubmit` `additionalContext` reaches the model, ⑤ `Stop` stdin JSON includes a readable `transcript_path`, ⑥ exact flag names/semantics on the installed CLI (`--append-system-prompt`, `--allowedTools`, `--permission-mode`), ⑦ killing the PTY reaps the process tree. | Any failure here stops the plan (this is the make-or-break). Write results to `docs/archive/CLAUDE_RUNTIME_SPIKE_RESULT.md`. |
+| **P1 — types & availability (½ day)** | `NodeRuntime` + `"claude"`, `VALID_RUNTIMES`, `claudeAvailability.ts` + tests, `runtimes.claude` in info/health/WS. | `npm test` green; UI unchanged (selector still 2 options until P5). |
+| **P2 — hook bridge (1–2 days)** | `orchestra-hook.mjs` + isolated tests: sentinel parsing (same fixtures as `call-agent.test.ts`), POST shapes, self-gating without env, fail-open on network error. | Tests green without any Claude installed (pure Node). |
+| **P3 — ClaudeRuntime (1–2 days)** | `ClaudeRuntime.ts` + `resolveClaudeSettings.ts` + tests mirroring `HermesRuntime.test.ts` (spawn args, env, toolset override + fallback, exit handling). | Tests green; `PiRuntime`/`HermesRuntime` tests untouched. |
+| **P4 — PtyHub wiring (1 day)** | Spawn selection branch; watchdog gate → `SERVER_NUDGED_RUNTIMES` (characterization test first). | `detect_changes()` shows only expected symbols; full suite green. |
+| **P5 — frontend (½–1 day)** | RuntimeSelector third option (gated on `runtimes.claude`), `RuntimeBadge` "cc", labels "{runtime}". | Frontend tests green. |
+| **P6 — e2e + docs (1 day)** | Mixed graph pi → claude → hermes on the pre-merge checklist (incl. the two closed-loop submit rows); `docs/guides/CLAUDE_RUNTIME.md`; ARCHITECTURE runtime table 🔜→✅; this plan → `docs/archive/`. | Checklist pass + `npm run build`. |
+
+**Total: ~1 week** (vs ~3–4 for Hermes — the runtime abstraction, the text
+protocol, the closed-loop submit and the availability pattern all exist now).
 
 ---
 
-## 6. Risks & open questions
+## 5. Risks & open questions
 
-1. **Permission prompts block the pipeline.** An interactive `claude` may prompt
-   before running tools. There is no human at a pipeline node, so the orchestra
-   MCP tools (and the default toolset) **must** be pre-allowed
-   (`--allowedTools` + `--permission-mode`). Confirm the exact, current flag
-   semantics against the installed `claude --version` — CLI surface evolves and
-   this plan should not assume a frozen flag set.
-2. **`UserPromptSubmit` granularity.** It fires per submitted prompt, not per
-   internal LLM step of an agentic loop. That's the same effective behaviour we
-   want (appendix refreshed when a task arrives / a graph edit is picked up on
-   the next task) — but it is **not** identical to Hermes' `pre_llm_call` which
-   fires every model call. Validate that graph-edit pickup latency is acceptable;
-   if not, fall back to exposing context as an MCP tool the model can pull.
-3. **Auth/credentials.** Claude Code needs its own auth (API key or logged-in
-   session). Orchestra must **not** manage that — it inherits the host env. Keep
-   it out of `runtimeConfig` (which is documented as secret-free).
-4. **`Stop` can fire on every turn / re-fire.** Ensure the watchdog logic in
-   `/internal/turn-ended` is idempotent enough (it already keys retries by
-   `boardId:nodeId` and clears on handoff).
-5. **MCP child lifecycle.** The MCP server is a child of `claude`, which is a
-   child of the PTY; killing the PTY (`kill()`) must reap the whole tree. Verify
-   no orphaned MCP processes after `abort_node` / `stop_board`.
+| # | Risk | Mitigation |
+|---|------|------------|
+| 1 | **Permission prompts block the pipeline** (tool approval UX in interactive mode) | `--allowedTools` + `--permission-mode`; P0 ⑥ verifies exact semantics on the installed version; fallback: `--dangerously-skip-permissions` is **not** acceptable — prefer documenting a narrower default toolset |
+| 2 | **`UserPromptSubmit` fires per user prompt, not per agentic step** | That matches what we need (appendix refresh + turn-started when a task arrives). pi behaves the same way. Validate graph-edit pickup latency in P6. |
+| 3 | **`Stop` may fire on subagent stops / re-fire** | `handleTurnEnded` retry state is keyed and clears on handoff (already idempotent); prefer the top-level Stop event only (`stop_hook_active` guard) — P0 ⑤ |
+| 4 | **Transcript format drift** (Stop-hook parsing depends on the JSONL shape) | Parser lives in one function with fixtures; a drift breaks tests, not prod silently (fail-open → watchdog nudges) |
+| 5 | **CLI surface evolves** | Pin the tested `claude --version` in the spike result doc; availability check can gate on a minimum version if needed |
+| 6 | **Auth/credentials** | Claude Code inherits the host env / its own login — Orchestra never manages it; keep out of `runtimeConfig` (secret-free by contract) |
+| 7 | **Orphaned processes on kill** | P0 ⑦; PtyRuntime.kill() SIGKILLs the PTY child — verify the `claude` process tree dies with it |
 
 ---
 
-## 7. Verify (pre-commit, from `AGENTS.md`)
+## 6. What NOT to do
 
-```bash
-npm test --workspaces --if-present
-npx tsc --noEmit -p backend
-npm run build
-```
-
-Plus the project's GitNexus guardrails: run `impact({target: "ensure"...})`-style
-analysis before touching `PtyHub` spawn, and `detect_changes()` before commit —
-the only code symbols that should move are the new `ClaudeRuntime`, the
-`PtyHub` selection branch, and `WorkflowNode.runtime`.
+1. **No MCP server for handoff/card** — one text protocol, one parser contract.
+2. **No new `/internal/*` endpoints** — the six existing ones cover everything.
+3. **No writes to `~/.claude`** — settings are passed per-spawn via `--settings`.
+4. **No PtyHub rewrite** — one selection branch + the watchdog-gate set.
+5. **No acting on non-Orchestra sessions** — hook script self-gates on `PINODES_ORCHESTRA_NODE`.
+6. **No enabling when unavailable** — same auto-detect + fallback-to-pi as Hermes.
 
 ---
 
-## 8. Definition of done
+## 7. Definition of done
 
-- A node with `runtime: "claude"` (and `PINODES_ORCHESTRA_CLAUDE=true`) boots a
-  live Claude Code terminal in its card, hands off via `orchestra_handoff`
-  (native MCP tool, no text parsing), moves Kanban cards, refreshes its appendix
-  per task, reports ready, and is nudged by the determinism watchdog when a
-  non-final node ends without a handoff — all through the **unchanged**
-  `/internal/*` contract.
-- No new backend endpoints. No secrets in `runtimeConfig`. Multi-instance
-  isolation untouched.
+A node with `runtime: "claude"` (with `claude` on the backend PATH) boots a live
+Claude Code terminal in its card, receives tasks with closed-loop submit
+confirmation, refreshes its orchestration appendix per task, hands off /
+moves Kanban cards / declares `@@DONE` via the shared sentinel protocol, is
+nudged server-side when a non-final node ends without explicit intent, and
+cleans up on kill — all through the unchanged `/internal/*` contract, with pi
+and Hermes behavior byte-identical to today.

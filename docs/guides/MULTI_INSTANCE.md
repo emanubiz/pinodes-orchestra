@@ -223,9 +223,9 @@ webview talk to its own backend with its own token.
   (`call-agent.ts`), the Hermes plugin (`hermes-plugins/orchestra`), and any future
   runtime such as Claude Code — calls `PINODES_ORCHESTRA_URL`, which is built from
   this backend's port (`BASE_URL` in `PtyHub.ts`, `PINODES_ORCHESTRA_PORT ?? PORT`).
-  So `orchestra-context` / `ready` / `turn-ended` / `call-agent` / `handoff-failed`
-  / `card-status` always land in the **right** per-window backend, regardless of
-  runtime. The same `PINODES_ORCHESTRA_TOKEN` is forwarded to every runtime, so
+  So `orchestra-context` / `ready` / `turn-started` / `turn-ended` / `call-agent`
+  / `handoff-failed` / `card-status` always land in the **right** per-window
+  backend, regardless of runtime. The same `PINODES_ORCHESTRA_TOKEN` is forwarded to every runtime, so
   authenticated `/internal/*` calls work identically across pi/hermes/claude.
 - **Dynamic CORS.** `buildAllowedOrigins(PORT)` already includes
   `http://localhost:${port}` and `127.0.0.1:${port}`.
