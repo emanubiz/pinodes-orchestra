@@ -495,6 +495,7 @@ export function App() {
           boardId={activeBoard.id}
           nodeId={overlayNodeId}
           label={overlayNode?.data.label ?? "pi"}
+          runtime={overlayNode?.data.runtime ?? "pi"}
           send={send}
           onClose={() => setOverlayNodeId(null)}
         />

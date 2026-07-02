@@ -39,6 +39,32 @@ Never store API keys or tokens in `runtimeConfig` — it is persisted to SQLite 
 3. JSONL events are converted to terminal-safe output in the node panel
 4. Handoffs use the same sentinels as pi/Hermes/Claude: `@@HANDOFF`, `@@CARD`, `@@DONE`
 
+## UI behavior
+
+Structured nodes render output in the terminal panel, but **keyboard input is disabled**
+— use **Run** or programmatic inject to send tasks. The side panel shows a hint when a
+Codex node is selected.
+
+## Example flow: Architect → Codex Developer → Reviewer
+
+1. Create a board with cwd set to your repo.
+2. Add three nodes:
+   - **Architect** — `runtime: pi` (or any runtime), prompt `builtin-architect`
+   - **Developer** — `runtime: codex`, prompt `builtin-developer`, `canBeFinal: false`
+   - **Reviewer** — `runtime: pi`, prompt `builtin-architect-reviewer`
+3. Wire edges: Architect → Developer → Reviewer.
+4. Set Architect as entry node; run with a task like "Design and implement feature X".
+5. Architect hands off to the Codex Developer node via `@@HANDOFF`.
+6. Codex implements in `workspace-write` sandbox and hands off to Reviewer.
+7. Reviewer completes the chain with `@@DONE` or further handoffs.
+
+REST equivalent (abbreviated):
+
+```bash
+curl -X POST "$BASE/api/v1/orchestra/boards/$BOARD/nodes" -H "Content-Type: application/json" \
+  -d '{"id":"dev","label":"Developer","promptId":"builtin-developer","runtime":"codex","canBeFinal":false,"position":{"x":200,"y":0}}'
+```
+
 ## Smoke checklist
 
 1. Confirm `/api/info` shows `runtimes.codex: true`
