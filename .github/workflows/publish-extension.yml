@@ -98,6 +98,12 @@ jobs:
       # OVSX_PAT) — never passed as a CLI arg, so they don't appear in process
       # listings. GitHub also masks secret values in logs and withholds them from
       # fork PRs entirely.
+      # Both publish loops are IDEMPOTENT and RESILIENT:
+      #  - "already published"/"already exists" → skip with a notice, so a re-run
+      #    after a partial publish (e.g. a registry 503 halfway through the
+      #    platforms) converges instead of dying on the first duplicate;
+      #  - any other error → keep trying the remaining platforms, then fail the
+      #    step at the end, so one platform's hiccup never blocks the others.
       - name: Publish to VS Code Marketplace
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
@@ -106,10 +112,20 @@ jobs:
             echo "::notice::VSCE_PAT not set — skipping VS Code Marketplace."
             exit 0
           fi
+          failed=0
           for vsix in vsix/*.vsix; do
             echo "Marketplace: publishing $vsix"
-            npx --yes @vscode/vsce publish --packagePath "$vsix"
+            if out=$(npx --yes @vscode/vsce publish --packagePath "$vsix" 2>&1); then
+              echo "$out"
+            elif echo "$out" | grep -qiE "already (published|exists)"; then
+              echo "::notice::$vsix already on the Marketplace — skipping."
+            else
+              echo "$out"
+              echo "::error::Marketplace publish failed for $vsix"
+              failed=1
+            fi
           done
+          exit $failed
 
       - name: Publish to Open VSX
         env:
@@ -119,7 +135,17 @@ jobs:
             echo "::notice::OVSX_TOKEN not set — skipping Open VSX."
             exit 0
           fi
+          failed=0
           for vsix in vsix/*.vsix; do
             echo "Open VSX: publishing $vsix"
-            npx --yes ovsx publish "$vsix"
+            if out=$(npx --yes ovsx publish "$vsix" 2>&1); then
+              echo "$out"
+            elif echo "$out" | grep -qiE "already (published|exists)"; then
+              echo "::notice::$vsix already on Open VSX — skipping."
+            else
+              echo "$out"
+              echo "::error::Open VSX publish failed for $vsix"
+              failed=1
+            fi
           done
+          exit $failed
